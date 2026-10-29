@@ -4,8 +4,13 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.minedraft.lib.client.ClientAreas;
 import dev.minedraft.lib.client.LibConfig;
 import dev.minedraft.lib.client.editor.ui.HelpOverlay;
+import dev.minedraft.lib.client.editor.ui.LayerSlider;
 import dev.minedraft.lib.client.editor.ui.Modal;
+import dev.minedraft.lib.client.editor.ui.SidePanel;
+import dev.minedraft.lib.client.editor.ui.ToolBar;
 import dev.minedraft.lib.client.editor.ui.ToolButton;
+import dev.minedraft.lib.client.editor.ui.TopBar;
+import dev.minedraft.lib.client.editor.ui.ViewCube;
 import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.minedraft.lib.client.ui.Icons;
 import dev.minedraft.lib.client.ui.Ui;
@@ -32,10 +37,25 @@ import java.util.UUID;
  * 여기서 하는 일: 불러오기 화면, 카메라 조작(우클릭 끌기·휠·이동 키·Q/E), 단면(L, Shift+L, Ctrl+클릭, Shift+휠),
  * 투시(X), 테두리(G), 도움말(H), 되돌리기(Ctrl+Z/Y), 창(모달)·입력칸 포커스·툴팁, 커서 아래 칸 찾기와 다른 편집자에게 커서 알리기.
  * <p>
- * 모드가 할 일: {@link #layout()} 에서 조각 배치, {@link #renderViewport} 로 월드 그리기, 도구 입력은 {@code viewport*} 훅.
+ * <pre>
+ * 상단 바: 영역·편집자 정보     좌측 툴바: 도구 (모드가 등록)
+ * 하단 바: 모드가 정함 (없어도 됨) 우측 창: 탭 (모드가 등록, 범위 탭은 Lib 제공)
+ * 뷰포트: 나머지 전부 (단면 슬라이더·시점 큐브, 모드가 얹는 것)
+ * </pre>
+ * 모드가 할 일: 생성자에서 도구·탭 등록과 {@link #assembleParts}, {@link #renderViewport} 로 월드 그리기, 도구 입력은 {@code viewport*} 훅.
  */
 public abstract class AreaEditorScreen extends Screen {
+    public static final int TOP = 16, LEFT = 22;
+
     private final AreaEditorSession base;
+    public final TopBar topBar;
+    public final ToolBar toolBar;
+    public final SidePanel sidePanel;
+    public final LayerSlider layerSlider;
+    public final ViewCube viewCube;
+    /** 아래쪽 바 (없으면 null). 높이는 {@link UiPart#requiredHeight}. */
+    @Nullable
+    protected UiPart<?> bottomBar;
     /** 그리는 순서 = 아래에서 위로 (누르기는 반대 순서로 위에 있는 것부터). */
     protected final List<UiPart<?>> parts = new ArrayList<>();
     /** 왼쪽 툴바 위쪽의 도구 단추 (모드가 생성자에서 채운다). */
@@ -73,6 +93,27 @@ public abstract class AreaEditorScreen extends Screen {
     protected AreaEditorScreen(Component title, AreaEditorSession session) {
         super(title);
         this.base = session;
+        this.topBar = new TopBar(this);
+        this.toolBar = new ToolBar(this);
+        this.sidePanel = new SidePanel(this);
+        this.layerSlider = new LayerSlider(this);
+        this.viewCube = new ViewCube(this);
+    }
+
+    /**
+     * 조각을 그리는 순서대로 모은다 (누르기는 반대 순서로 위에 있는 것부터).
+     * 뷰포트 위에 얹는 것(overlays) &lt; 단면 슬라이더 · 시점 큐브 &lt; 오른쪽 창 &lt; 가장자리 바 (도구 · 아래쪽 · 상단).
+     */
+    protected final void assembleParts(@Nullable UiPart<?> bottom, UiPart<?>... overlays) {
+        parts.clear();
+        bottomBar = bottom;
+        parts.addAll(List.of(overlays));
+        parts.add(layerSlider);
+        parts.add(viewCube);
+        parts.add(sidePanel);
+        parts.add(toolBar);
+        if (bottom != null) parts.add(bottom);
+        parts.add(topBar);
     }
 
     public AreaEditorSession session() {
@@ -119,7 +160,41 @@ public abstract class AreaEditorScreen extends Screen {
     // ------------------------------------------------------------------
 
     /** 조각 배치와 뷰포트(vpX..vpH) 계산. 그릴 때마다 부른다. 카메라에 화면 크기도 알린다. */
-    public abstract void layout();
+    public void layout() {
+        int W = width, H = height;
+        boolean userCollapsed = LibConfig.get().panelCollapsed;
+        int panelW = SidePanel.WIDTH;
+        panelAutoCollapsed = (W - LEFT - panelW) < W * 0.6;
+        boolean collapsed = userCollapsed || panelAutoCollapsed;
+        int right = collapsed ? SidePanel.STRIP : panelW;
+        bottomH = bottomBar == null ? 0 : bottomBar.requiredHeight(W - LEFT);
+        topBar.setBounds(0, 0, W, TOP);
+        toolBar.setBounds(0, TOP, LEFT, H - TOP);
+        if (bottomBar != null) bottomBar.setBounds(LEFT, H - bottomH, W - LEFT, bottomH);
+        sidePanel.setBounds(W - right, TOP, right, H - TOP - bottomH);
+        sidePanel.setCollapsed(collapsed);
+        vpX = LEFT;
+        vpY = TOP;
+        vpW = W - LEFT - SidePanel.STRIP;
+        if (!collapsed) vpW = W - LEFT - panelW;
+        vpH = H - TOP - bottomH;
+        int floor = layoutOverlays();
+        layerSlider.setBounds(vpX + vpW - 30, vpY + 26, 26, floor - vpY - 34);
+        // 시점 큐브: 뷰포트 오른쪽 위, 층 슬라이더 왼쪽
+        int cubeRight = viewCubeRight(vpX + vpW - 34);
+        viewCube.setBounds(cubeRight - 64, vpY + 4, 64, 84);
+        base.camera.setViewport(W, H);
+    }
+
+    /** 뷰포트 위에 얹는 모드 조각 배치 (vp* 가 정해진 뒤). 돌려주는 값: 뷰포트 안 떠 있는 조각들이 내려올 수 있는 아래 끝. */
+    protected int layoutOverlays() {
+        return vpY + vpH;
+    }
+
+    /** 시점 큐브 오른쪽 끝 (오른쪽에 다른 것이 열려 있으면 비켜 선다). */
+    protected int viewCubeRight(int preferred) {
+        return preferred;
+    }
 
     public boolean inViewport(double mx, double my) {
         if (!Ui.inside(mx, my, vpX, vpY, vpW, vpH)) return false;
@@ -129,7 +204,7 @@ public abstract class AreaEditorScreen extends Screen {
 
     /** 이 조각이 뷰포트 위를 가리는지 (그 자리는 월드를 누를 수 없다). */
     protected boolean blocksViewport(UiPart<?> p) {
-        return true;
+        return p != topBar;
     }
 
     // ------------------------------------------------------------------
@@ -338,6 +413,7 @@ public abstract class AreaEditorScreen extends Screen {
             }
         }
         if (focused != null && !focused.isMouseOver(mx, my)) unfocus(true);
+        sidePanel.closeOverlayIfOutside(mx, my);
         if (popupClicked(mx, my, button)) return true;
         for (int i = parts.size() - 1; i >= 0; i--) {
             UiPart<?> p = parts.get(i);
@@ -534,7 +610,7 @@ public abstract class AreaEditorScreen extends Screen {
             case GLFW.GLFW_KEY_E -> base.camera.rotate(1);
             case GLFW.GLFW_KEY_TAB -> {
                 LibConfig.get().panelCollapsed = !LibConfig.get().panelCollapsed;
-                if (panelAutoCollapsed) togglePanelOverlay();
+                if (panelAutoCollapsed) sidePanel.toggleOverlay();
             }
             case GLFW.GLFW_KEY_G -> toggleOutlines();
             case GLFW.GLFW_KEY_H -> showHelp = !showHelp;
@@ -557,10 +633,6 @@ public abstract class AreaEditorScreen extends Screen {
     /** 모드의 단축키 (도구 등). 받았으면 true. 기본 키(Q E Tab G H L X)보다 먼저 본다. */
     protected boolean editorKey(int key) {
         return false;
-    }
-
-    /** 화면이 좁아 자동으로 접힌 오른쪽 창을 Tab 으로 겹쳐 열고 닫기. */
-    protected void togglePanelOverlay() {
     }
 
     /** Esc: 기본은 도움말 닫기, 아니면 편집창 닫기. */

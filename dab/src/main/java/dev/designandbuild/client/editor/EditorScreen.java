@@ -13,14 +13,10 @@ import dev.minedraft.lib.client.ui.Icons;
 
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.ui.BlockPicker;
-import dev.minedraft.lib.client.editor.ui.LayerSlider;
 import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.editor.ui.OptionBar;
 import dev.designandbuild.client.editor.ui.OrientationPopup;
 import dev.designandbuild.client.editor.ui.PaletteBar;
-import dev.minedraft.lib.client.editor.ui.SidePanel;
-import dev.minedraft.lib.client.editor.ui.ToolBar;
-import dev.minedraft.lib.client.editor.ui.TopBar;
 import dev.minedraft.lib.client.editor.ui.ToolButton;
 import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.minedraft.lib.client.ui.Icons;
@@ -61,18 +57,13 @@ import java.util.Objects;
  * </pre>
  */
 public final class EditorScreen extends AreaEditorScreen {
-    public static final int TOP = 16, LEFT = 22, PALETTE_H = 20;
+    public static final int PALETTE_H = 20;
 
     private final EditorSession s;
 
-    public final TopBar topBar;
-    public final ToolBar toolBar;
     public final OptionBar optionBar;
     public final PaletteBar paletteBar;
-    public final SidePanel sidePanel;
     public final dev.designandbuild.client.editor.ui.OrderTab orderTab;
-    public final LayerSlider layerSlider;
-    public final dev.minedraft.lib.client.editor.ui.ViewCube viewCube;
     /** 이번 클릭으로 설치 미리보기 창이 닫혔다 (옵션 바 버튼이 다시 열지 않게). */
     public boolean popupJustClosed;
 
@@ -111,19 +102,12 @@ public final class EditorScreen extends AreaEditorScreen {
     public EditorScreen(EditorSession session) {
         super(Component.translatable("designandbuild.editor.title"), session);
         this.s = session;
-        this.topBar = new TopBar(this);
-        this.toolBar = new ToolBar(this);
         this.optionBar = new OptionBar(this);
         this.paletteBar = new PaletteBar(this);
-        this.sidePanel = new SidePanel(this);
         this.orderTab = new dev.designandbuild.client.editor.ui.OrderTab(this);
         panelTabs.add(new dev.designandbuild.client.editor.ui.LibraryTab(this));
         panelTabs.add(orderTab);
         panelTabs.add(new dev.minedraft.lib.client.editor.ui.RangeTab(this));
-        this.layerSlider = new LayerSlider(this);
-        this.viewCube = new dev.minedraft.lib.client.editor.ui.ViewCube(this);
-        // 그리는 순서 = 아래에서 위로 (누르기는 반대 순서로 위에 있는 것부터).
-        // 뷰포트 위 도구(팔레트·단면 슬라이더·시점 큐브) < 오른쪽 창 < 가장자리 바 (옵션·도구·상단)
         tools.add(new ToolButton(Icons.SELECT, "V", "designandbuild.tool.select", "designandbuild.tool.select.tip",
                 () -> s.tool == EditorSession.Tool.SELECT, () -> setTool(EditorSession.Tool.SELECT)));
         tools.add(new ToolButton(Icons.DIRECT, "B", "designandbuild.tool.direct", "designandbuild.tool.direct.tip",
@@ -131,13 +115,7 @@ public final class EditorScreen extends AreaEditorScreen {
         tools.add(new ToolButton(Icons.PLACE, "P", "designandbuild.tool.place", "designandbuild.tool.place.tip",
                 () -> s.tool == EditorSession.Tool.PLACE, () -> setTool(EditorSession.Tool.PLACE)));
         toggles.add(new ToolButton(Icons.TAGS, null, "designandbuild.editor.tag_view", null, () -> tagView, () -> tagView = !tagView));
-        parts.add(paletteBar);
-        parts.add(layerSlider);
-        parts.add(viewCube);
-        parts.add(sidePanel);
-        parts.add(toolBar);
-        parts.add(optionBar);
-        parts.add(topBar);
+        assembleParts(optionBar, paletteBar);
     }
 
     @Override
@@ -163,35 +141,18 @@ public final class EditorScreen extends AreaEditorScreen {
     // ------------------------------------------------------------------
 
     @Override
-    public void layout() {
-        int W = width, H = height;
-        boolean userCollapsed = LibConfig.get().panelCollapsed;
-        int panelW = SidePanel.WIDTH;
-        panelAutoCollapsed = (W - LEFT - panelW) < W * 0.6;
-        boolean collapsed = userCollapsed || panelAutoCollapsed;
-        int right = collapsed ? SidePanel.STRIP : panelW;
-        bottomH = optionBar.requiredHeight(W - LEFT);
-        topBar.setBounds(0, 0, W, TOP);
-        toolBar.setBounds(0, TOP, LEFT, H - TOP);
-        optionBar.setBounds(LEFT, H - bottomH, W - LEFT, bottomH);
-        sidePanel.setBounds(W - right, TOP, right, H - TOP - bottomH);
-        sidePanel.setCollapsed(collapsed);
-        vpX = LEFT;
-        vpY = TOP;
-        vpW = W - LEFT - SidePanel.STRIP;
-        if (!collapsed) vpW = W - LEFT - panelW;
-        vpH = H - TOP - bottomH;
+    protected int layoutOverlays() {
         int palW = PaletteBar.preferredWidth();
         int palX = vpX + Math.max(0, (vpW - palW) / 2);
-        int palY = H - bottomH - PALETTE_H - 2;
+        int palY = height - bottomH - PALETTE_H - 2;
         paletteBar.setBounds(palX, palY, Math.min(palW, vpW), PALETTE_H);
-        layerSlider.setBounds(vpX + vpW - 30, vpY + 26, 26, palY - vpY - 34);
-        // 시점 큐브: 뷰포트 오른쪽 위, 층 슬라이더 왼쪽
-        int cubeRight = vpX + vpW - 34;
+        return palY;
+    }
+
+    @Override
+    protected int viewCubeRight(int preferred) {
         // JEI 로 블록을 고르는 중이면 오른쪽에 JEI 목록과 안내 패널이 열리므로 그 왼쪽으로 비켜 선다
-        if (jeiPicking()) cubeRight = Math.min(cubeRight, BlockPicker.jeiPanelLeft(W) - 6);
-        viewCube.setBounds(cubeRight - 64, vpY + 4, 64, 84);
-        s.camera.setViewport(W, H);
+        return jeiPicking() ? Math.min(preferred, BlockPicker.jeiPanelLeft(width) - 6) : preferred;
     }
 
     private boolean jeiPicking() {
@@ -200,11 +161,6 @@ public final class EditorScreen extends AreaEditorScreen {
 
     public int paletteTop() {
         return ClientConfig.get().paletteCollapsed ? height - bottomH - 10 : paletteBar.y;
-    }
-
-    @Override
-    protected boolean blocksViewport(UiPart<?> p) {
-        return p != topBar;
     }
 
     // ------------------------------------------------------------------
@@ -474,7 +430,6 @@ public final class EditorScreen extends AreaEditorScreen {
 
     @Override
     protected boolean popupClicked(double mx, double my, int button) {
-        sidePanel.closeOverlayIfOutside(mx, my);
         if (orientationPopup != null) {
             if (orientationPopup.contains(mx, my)) {
                 orientationPopup.mouseClicked(mx, my, button);
@@ -779,11 +734,6 @@ public final class EditorScreen extends AreaEditorScreen {
             }
         }
         return true;
-    }
-
-    @Override
-    protected void togglePanelOverlay() {
-        sidePanel.toggleOverlay();
     }
 
     @Override

@@ -28,6 +28,11 @@ public abstract class UiPart<T extends AreaEditorScreen> {
         this.h = h;
     }
 
+    /** 바로 쓸 때 필요한 높이 (편집창 아래쪽 바 등). 기본은 지금 높이. */
+    public int requiredHeight(int width) {
+        return h;
+    }
+
     public boolean visible() {
         return true;
     }
