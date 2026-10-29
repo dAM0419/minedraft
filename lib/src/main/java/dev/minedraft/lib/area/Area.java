@@ -93,6 +93,13 @@ public final class Area {
         return layers.values();
     }
 
+    /** 어느 층이든 내용이 있는 청크. */
+    public it.unimi.dsi.fastutil.longs.LongOpenHashSet usedChunks() {
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet out = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        for (AreaLayer l : layers.values()) l.collectUsedChunks(out);
+        return out;
+    }
+
     // ------------------------------------------------------------------
     // 읽기
     // ------------------------------------------------------------------

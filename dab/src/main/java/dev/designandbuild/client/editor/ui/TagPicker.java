@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.SidePanel;
 import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.library.HiddenList;

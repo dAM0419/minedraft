@@ -1,15 +1,14 @@
-package dev.designandbuild.client.editor.ui;
+package dev.minedraft.lib.client.editor.ui;
 
 import dev.minedraft.lib.edit.EditRequests;
 
 import com.mojang.math.Axis;
-import dev.designandbuild.client.editor.EditorScreen;
-import dev.designandbuild.client.editor.EditorSession;
+import dev.minedraft.lib.area.Area;
+import dev.minedraft.lib.client.editor.AreaEditorScreen;
+import dev.minedraft.lib.client.editor.AreaEditorSession;
 import dev.minedraft.lib.client.ui.Icons;
 import dev.minedraft.lib.client.ui.Ui;
-import dev.designandbuild.core.BlueprintModel;
 import dev.minedraft.lib.util.Box;
-import dev.designandbuild.core.Requests;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.gui.GuiGraphics;
@@ -19,7 +18,10 @@ import net.minecraft.world.level.ChunkPos;
 import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 범위 탭: 위에서 본 청크 지도. 편집창 시점과 같은 방향으로 돌아가 있어 (Q·E 로 함께 돈다) 지도 위쪽 = 화면 위쪽.
@@ -28,14 +30,14 @@ import java.util.List;
  * 추가는 바로, 삭제는 고른 청크 중 수정된 것(설계 칸·구조물·작업 중인 편집자)이 있을 때만 한 번 더 묻는다.
  * 지도 이동은 우클릭 끌기.
  */
-final class RangeTab {
+public final class RangeTab implements PanelTab {
     private static final int CELL = 11;
     private static final int COLOR_IN = 0x8C2E8C84;        // 포함·수정 안 됨
     private static final int COLOR_MODIFIED = 0xE0D9962F;  // 포함·수정됨
     private static final int COLOR_CANDIDATE = 0x70FFFFFF; // 붙일 수 있음 (테두리)
     private static final int COLOR_EMPTY = 0x12FFFFFF;
 
-    private final EditorScreen screen;
+    private final AreaEditorScreen screen;
     private final LongOpenHashSet selected = new LongOpenHashSet();
     /** 지도 중심 (청크 좌표, 실수). 처음엔 영역 가운데. */
     private double centerX = Double.NaN, centerZ;
@@ -54,12 +56,22 @@ final class RangeTab {
     private final LongOpenHashSet modified = new LongOpenHashSet();
     private long modifiedRevision = Long.MIN_VALUE;
 
-    RangeTab(EditorScreen screen) {
+    public RangeTab(AreaEditorScreen screen) {
         this.screen = screen;
     }
 
-    private EditorSession s() {
+    private AreaEditorSession s() {
         return screen.session();
+    }
+
+    @Override
+    public String title() {
+        return "minedraftlib.panel.range";
+    }
+
+    @Override
+    public int icon() {
+        return Icons.RANGE;
     }
 
     // ------------------------------------------------------------------
@@ -109,18 +121,19 @@ final class RangeTab {
     // 그리기
     // ------------------------------------------------------------------
 
-    void render(GuiGraphics g, int x, int y, int w, int h, int mx, int my) {
+    @Override
+    public void render(GuiGraphics g, int x, int y, int w, int h, int mx, int my) {
         px = x;
         py = y;
         pw = w;
         ph = h;
-        EditorSession s = s();
-        BlueprintModel m = s.model;
+        AreaEditorSession s = s();
+        Area m = s.area;
         refreshModified(m);
         pruneSelection(m);
         updateAngle();
-        Component count = Component.translatable("designandbuild.range.count", m.chunks().size(), BlueprintModel.MAX_CHUNKS);
-        Ui.text(g, count, x + 6, y + 5, m.chunks().size() >= BlueprintModel.MAX_CHUNKS ? Ui.WARN : Ui.TEXT);
+        Component count = Component.translatable("minedraftlib.range.count", m.chunks().size(), m.type.maxChunks());
+        Ui.text(g, count, x + 6, y + 5, m.chunks().size() >= m.type.maxChunks() ? Ui.WARN : Ui.TEXT);
 
         mapX = x + 4;
         mapY = y + 18;
@@ -167,7 +180,7 @@ final class RangeTab {
         // 기준 청크 표시 (돌리지 않음)
         long base = m.baseChunk();
         double[] bp = toScreen(ChunkPos.getX(base) + 0.5, ChunkPos.getZ(base) + 0.5);
-        Ui.icon(g, Icons.BLUEPRINT, (int) Math.round(bp[0]) - 8, (int) Math.round(bp[1]) - 8, 0xFFFFFFFF);
+        Ui.icon(g, screen.titleIcon(), (int) Math.round(bp[0]) - 8, (int) Math.round(bp[1]) - 8, 0xFFFFFFFF);
         // 북쪽 표시: 지도 가장자리, 실제 북쪽 방향
         double nx = Math.sin(angle) * (Math.min(mapW, mapH) / 2.0 - 7), ny = -Math.cos(angle) * (Math.min(mapW, mapH) / 2.0 - 7);
         Component north = Component.translatable("minedraftlib.compass.letter.north");
@@ -182,17 +195,17 @@ final class RangeTab {
         // 범례 (2열)
         int legY = mapY + mapH + 5;
         int col2 = x + w / 2 + 2;
-        legend(g, x + 6, legY, COLOR_IN, false, "designandbuild.range.legend.in");
-        legend(g, col2, legY, COLOR_MODIFIED, false, "designandbuild.range.legend.modified");
-        legend(g, x + 6, legY + 12, COLOR_CANDIDATE, true, "designandbuild.range.legend.add");
-        legend(g, col2, legY + 12, 0xFFFFFFFF, true, "designandbuild.range.legend.selected");
+        legend(g, x + 6, legY, COLOR_IN, false, "minedraftlib.range.legend.in");
+        legend(g, col2, legY, COLOR_MODIFIED, false, "minedraftlib.range.legend.modified");
+        legend(g, x + 6, legY + 12, COLOR_CANDIDATE, true, "minedraftlib.range.legend.add");
+        legend(g, col2, legY + 12, 0xFFFFFFFF, true, "minedraftlib.range.legend.selected");
 
         // 버튼
         int[] counts = counts(m);
         buttonY = legY + 28;
-        Component add = Component.translatable("designandbuild.range.add_button", counts[0]);
-        Component remove = Component.translatable("designandbuild.range.remove_button", counts[1]);
-        Component clear = Component.translatable("designandbuild.range.clear_selection");
+        Component add = Component.translatable("minedraftlib.range.add_button", counts[0]);
+        Component remove = Component.translatable("minedraftlib.range.remove_button", counts[1]);
+        Component clear = Component.translatable("minedraftlib.range.clear_selection");
         addW = Ui.font().width(add) + 12;
         removeW = Ui.font().width(remove) + 12;
         clearW = Ui.font().width(clear) + 12;
@@ -211,7 +224,7 @@ final class RangeTab {
         }
         int hintY = buttonY + 21;
         if (hintY + 9 <= y + h) {
-            for (var line : Ui.wrap(Component.translatable("designandbuild.range.hint"), w - 12)) {
+            for (var line : Ui.wrap(Component.translatable("minedraftlib.range.hint"), w - 12)) {
                 if (hintY + 9 > y + h) break;
                 g.drawString(Ui.font(), line, x + 6, hintY, Ui.DIM, false);
                 hintY += 10;
@@ -219,13 +232,13 @@ final class RangeTab {
         }
     }
 
-    private void tooltip(BlueprintModel m, long c) {
+    private void tooltip(Area m, long c) {
         Component state;
-        if (c == m.baseChunk()) state = Component.translatable("designandbuild.range.base");
-        else if (m.chunks().contains(c)) state = Component.translatable(modified.contains(c) ? "designandbuild.range.state.modified" : "designandbuild.range.state.in");
-        else if (touchesArea(m, c)) state = Component.translatable("designandbuild.range.state.candidate");
-        else state = Component.translatable("designandbuild.range.state.out");
-        screen.tooltip = List.of(Component.translatable("designandbuild.range.chunk", ChunkPos.getX(c), ChunkPos.getZ(c)), state);
+        if (c == m.baseChunk()) state = Component.translatable("minedraftlib.range.base");
+        else if (m.chunks().contains(c)) state = Component.translatable(modified.contains(c) ? "minedraftlib.range.state.modified" : "minedraftlib.range.state.in");
+        else if (touchesArea(m, c)) state = Component.translatable("minedraftlib.range.state.candidate");
+        else state = Component.translatable("minedraftlib.range.state.out");
+        screen.tooltip = List.of(Component.translatable("minedraftlib.range.chunk", ChunkPos.getX(c), ChunkPos.getZ(c)), state);
     }
 
     private static void legend(GuiGraphics g, int x, int y, int color, boolean outline, String key) {
@@ -246,30 +259,26 @@ final class RangeTab {
     // 상태
     // ------------------------------------------------------------------
 
-    private static boolean touchesArea(BlueprintModel m, long c) {
+    private static boolean touchesArea(Area m, long c) {
         int cx = ChunkPos.getX(c), cz = ChunkPos.getZ(c);
         return m.chunks().contains(ChunkPos.asLong(cx + 1, cz)) || m.chunks().contains(ChunkPos.asLong(cx - 1, cz))
                 || m.chunks().contains(ChunkPos.asLong(cx, cz + 1)) || m.chunks().contains(ChunkPos.asLong(cx, cz - 1));
     }
 
-    /** 설계 칸·구조물 블록이 하나라도 있는 청크 (도면 판이 바뀔 때만 다시 센다). */
-    private void refreshModified(BlueprintModel m) {
+    /** 어느 층이든 내용이 있는 청크 (영역 판이 바뀔 때만 다시 센다). */
+    private void refreshModified(Area m) {
         if (modifiedRevision == m.revision()) return;
         modifiedRevision = m.revision();
         modified.clear();
-        LongIterator it = m.resolvedMap().keySet().iterator();
-        while (it.hasNext()) {
-            long p = it.nextLong();
-            modified.add(ChunkPos.asLong(BlockPos.getX(p) >> 4, BlockPos.getZ(p) >> 4));
-        }
+        for (var l : m.layers()) l.collectUsedChunks(modified);
     }
 
     /** 다른 편집자가 먼저 반영해 의미가 없어진 선택은 그대로 둬도 되지만, 기준 청크는 고를 수 없다. */
-    private void pruneSelection(BlueprintModel m) {
+    private void pruneSelection(Area m) {
         selected.remove(m.baseChunk());
     }
 
-    private LongOpenHashSet addSet(BlueprintModel m) {
+    private LongOpenHashSet addSet(Area m) {
         LongOpenHashSet out = new LongOpenHashSet();
         LongIterator it = selected.iterator();
         while (it.hasNext()) {
@@ -279,7 +288,7 @@ final class RangeTab {
         return out;
     }
 
-    private LongOpenHashSet removeSet(BlueprintModel m) {
+    private LongOpenHashSet removeSet(Area m) {
         LongOpenHashSet out = new LongOpenHashSet();
         LongIterator it = selected.iterator();
         while (it.hasNext()) {
@@ -289,7 +298,7 @@ final class RangeTab {
         return out;
     }
 
-    private int[] counts(BlueprintModel m) {
+    private int[] counts(Area m) {
         int add = 0, remove = 0;
         LongIterator it = selected.iterator();
         while (it.hasNext()) {
@@ -300,7 +309,7 @@ final class RangeTab {
     }
 
     private void recenter() {
-        Box a = s().model.areaBounds();
+        Box a = s().area.areaBounds();
         centerX = (a.minX() + a.maxX() + 1) / 32.0;
         centerZ = (a.minZ() + a.maxZ() + 1) / 32.0;
     }
@@ -309,8 +318,9 @@ final class RangeTab {
     // 입력
     // ------------------------------------------------------------------
 
-    boolean mouseClicked(double mx, double my, int button) {
-        BlueprintModel m = s().model;
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        Area m = s().area;
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && Ui.inside(mx, my, addX, buttonY, addW, 16)) {
             applyAdd(m);
             return true;
@@ -335,7 +345,7 @@ final class RangeTab {
             long c = chunkAt(mx, my);
             if (c == Long.MIN_VALUE) return true;
             if (c == m.baseChunk()) {
-                s().toast(Component.translatable("designandbuild.range.base"));
+                s().toast(Component.translatable("minedraftlib.range.base"));
                 return true;
             }
             painting = true;
@@ -345,16 +355,17 @@ final class RangeTab {
         return true;
     }
 
-    private void paint(long c, BlueprintModel m) {
+    private void paint(long c, Area m) {
         if (c == Long.MIN_VALUE || c == lastPainted || c == m.baseChunk()) return;
         lastPainted = c;
         if (paintSelect) selected.add(c);
         else selected.remove(c);
     }
 
-    boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (painting) {
-            paint(chunkAt(mx, my), s().model);
+            paint(chunkAt(mx, my), s().area);
             return true;
         }
         if (panning) {
@@ -370,7 +381,8 @@ final class RangeTab {
         return false;
     }
 
-    boolean mouseReleased(double mx, double my, int button) {
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
         boolean was = painting || panning;
         painting = false;
         panning = false;
@@ -378,7 +390,8 @@ final class RangeTab {
         return was;
     }
 
-    boolean mouseScrolled(double mx, double my, double delta) {
+    @Override
+    public boolean mouseScrolled(double mx, double my, double delta) {
         return true;
     }
 
@@ -387,7 +400,7 @@ final class RangeTab {
     // ------------------------------------------------------------------
 
     /** 추가: 확인 없이 바로. */
-    private void applyAdd(BlueprintModel m) {
+    private void applyAdd(Area m) {
         LongOpenHashSet add = addSet(m);
         if (add.isEmpty()) return;
         String error = m.checkChunkChange(add, new LongOpenHashSet());
@@ -400,7 +413,7 @@ final class RangeTab {
     }
 
     /** 삭제: 고른 청크 중 수정된 것이 있으면 무엇이 사라지는지 보여 주고 한 번 더 묻는다. */
-    private void applyRemove(BlueprintModel m) {
+    private void applyRemove(Area m) {
         LongOpenHashSet remove = removeSet(m);
         if (remove.isEmpty()) return;
         String error = m.checkChunkChange(new LongOpenHashSet(), remove);
@@ -412,8 +425,27 @@ final class RangeTab {
             s().send(new EditRequests.ChunkChange(new long[0], remove.toLongArray()));
             selected.removeAll(remove);
         };
-        Dialogs.ChunkImpact impact = Dialogs.impactOf(s(), remove);
-        if (impact.modified()) screen.openModal(Dialogs.confirmRemoveChunks(screen, remove.size(), impact, send));
-        else send.run();
+        // 무엇이 사라지는지: 모드가 적는 내용 + 그 청크에서 작업 중인 편집자
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.translatable("minedraftlib.range.remove.count", remove.size()));
+        boolean modified = s().describeChunkRemoval(remove, lines);
+        List<String> working = new ArrayList<>();
+        for (Map.Entry<UUID, AreaEditorSession.RemoteCursor> e : s().cursors.entrySet()) {
+            AreaEditorSession.RemoteCursor c = e.getValue();
+            if (!c.has()) continue;
+            long chunk = ChunkPos.asLong(BlockPos.getX(c.pos()) >> 4, BlockPos.getZ(c.pos()) >> 4);
+            if (remove.contains(chunk)) {
+                String name = s().editors.getOrDefault(e.getKey(), "?");
+                if (!working.contains(name)) working.add(name);
+            }
+        }
+        if (!working.isEmpty()) lines.add(Component.translatable("minedraftlib.range.remove.working", String.join(", ", working)));
+        if (!modified && working.isEmpty()) {
+            send.run();
+            return;
+        }
+        screen.openModal(new ConfirmDialog(screen, Component.translatable("minedraftlib.range.remove.title"), lines,
+                Component.translatable("minedraftlib.range.remove.warning"), Component.translatable("minedraftlib.range.remove.confirm"),
+                true, send));
     }
 }

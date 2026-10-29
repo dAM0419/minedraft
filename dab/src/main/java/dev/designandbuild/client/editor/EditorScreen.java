@@ -18,7 +18,7 @@ import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.editor.ui.OptionBar;
 import dev.designandbuild.client.editor.ui.OrientationPopup;
 import dev.designandbuild.client.editor.ui.PaletteBar;
-import dev.designandbuild.client.editor.ui.SidePanel;
+import dev.minedraft.lib.client.editor.ui.SidePanel;
 import dev.minedraft.lib.client.editor.ui.ToolBar;
 import dev.minedraft.lib.client.editor.ui.TopBar;
 import dev.minedraft.lib.client.editor.ui.ToolButton;
@@ -70,6 +70,7 @@ public final class EditorScreen extends AreaEditorScreen {
     public final OptionBar optionBar;
     public final PaletteBar paletteBar;
     public final SidePanel sidePanel;
+    public final dev.designandbuild.client.editor.ui.OrderTab orderTab;
     public final LayerSlider layerSlider;
     public final dev.minedraft.lib.client.editor.ui.ViewCube viewCube;
     /** 이번 클릭으로 설치 미리보기 창이 닫혔다 (옵션 바 버튼이 다시 열지 않게). */
@@ -115,6 +116,10 @@ public final class EditorScreen extends AreaEditorScreen {
         this.optionBar = new OptionBar(this);
         this.paletteBar = new PaletteBar(this);
         this.sidePanel = new SidePanel(this);
+        this.orderTab = new dev.designandbuild.client.editor.ui.OrderTab(this);
+        panelTabs.add(new dev.designandbuild.client.editor.ui.LibraryTab(this));
+        panelTabs.add(orderTab);
+        panelTabs.add(new dev.minedraft.lib.client.editor.ui.RangeTab(this));
         this.layerSlider = new LayerSlider(this);
         this.viewCube = new dev.minedraft.lib.client.editor.ui.ViewCube(this);
         // 그리는 순서 = 아래에서 위로 (누르기는 반대 순서로 위에 있는 것부터).

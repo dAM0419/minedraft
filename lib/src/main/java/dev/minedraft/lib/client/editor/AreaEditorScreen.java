@@ -42,6 +42,8 @@ public abstract class AreaEditorScreen extends Screen {
     public final List<ToolButton> tools = new ArrayList<>();
     /** 왼쪽 툴바 아래쪽, 테두리와 도움말 사이의 보기 단추 (모드가 채운다). */
     public final List<ToolButton> toggles = new ArrayList<>();
+    /** 오른쪽 창의 탭 (모드가 채운다. 범위 탭은 {@link dev.minedraft.lib.client.editor.ui.RangeTab}). */
+    public final List<dev.minedraft.lib.client.editor.ui.PanelTab> panelTabs = new ArrayList<>();
 
     @Nullable
     public Modal<?> modal;

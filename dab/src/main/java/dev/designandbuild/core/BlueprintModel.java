@@ -344,6 +344,16 @@ public final class BlueprintModel implements AreaLayer {
         }
     }
 
+    @Override
+    public void collectUsedChunks(it.unimi.dsi.fastutil.longs.LongSet out) {
+        // 설계 칸·구조물 블록이 하나라도 있는 청크
+        it.unimi.dsi.fastutil.longs.LongIterator it = resolved.keySet().iterator();
+        while (it.hasNext()) {
+            long p = it.nextLong();
+            out.add(ChunkPos.asLong(BlockPos.getX(p) >> 4, BlockPos.getZ(p) >> 4));
+        }
+    }
+
     /** 청크가 빠졌다: 그 안의 설계를 모두 지운다. 구조물은 남은 블록만 남는다. */
     @Override
     public void onChunkRemoved(long chunk) {

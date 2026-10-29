@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.PanelTab;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
 import dev.minedraft.lib.client.ui.Icons;
@@ -18,12 +19,12 @@ import java.util.List;
  * 순서 탭: 배치된 구조물을 건축 순서대로. 끌어서 순서 바꾸기, 마우스를 올리면 뷰포트에서 볼륨 강조,
  * 덮어쓰기 충돌은 주황 ! (누르면 그 칸으로), 오른쪽 아이콘으로 저장·삭제. 이름을 두 번 누르면 이름 바꾸기.
  */
-final class OrderTab {
+public final class OrderTab implements PanelTab {
     private static final int ROW = 18;
 
     private final EditorScreen screen;
     private int scroll;
-    int hovered;
+    public int hovered;
     private int pressId;
     private double pressY;
     private boolean dragging;
@@ -34,7 +35,7 @@ final class OrderTab {
     private int renamingId;
     private int px, py, pw, ph;
 
-    OrderTab(EditorScreen screen) {
+    public OrderTab(EditorScreen screen) {
         this.screen = screen;
         this.rename = new EditBox(Ui.font(), 0, 0, 80, 12, Component.empty());
         rename.setBordered(false);
@@ -46,7 +47,18 @@ final class OrderTab {
         return screen.session();
     }
 
-    void render(GuiGraphics g, int x, int y, int w, int h, int mx, int my) {
+    @Override
+    public String title() {
+        return "designandbuild.panel.order";
+    }
+
+    @Override
+    public int icon() {
+        return Icons.ORDER;
+    }
+
+    @Override
+    public void render(GuiGraphics g, int x, int y, int w, int h, int mx, int my) {
         px = x;
         py = y;
         pw = w;
@@ -114,7 +126,8 @@ final class OrderTab {
         return (int) Math.floor((my - (py + 16) + scroll) / ROW);
     }
 
-    boolean mouseClicked(double mx, double my, int button) {
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
         List<StructureInstance> list = s().model.orderedStructures();
         int i = indexAt(my);
         if (my < py + 16 || i < 0 || i >= list.size()) return true;
@@ -160,7 +173,8 @@ final class OrderTab {
         return true;
     }
 
-    boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (pressId == 0) return false;
         if (!dragging && Math.abs(my - pressY) > 4) dragging = true;
         if (dragging) {
@@ -170,7 +184,8 @@ final class OrderTab {
         return true;
     }
 
-    boolean mouseReleased(double mx, double my, int button) {
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
         if (pressId == 0) return false;
         if (dragging && dropIndex >= 0) {
             int from = s().model.orderIndexOf(pressId);
@@ -183,7 +198,8 @@ final class OrderTab {
         return true;
     }
 
-    boolean mouseScrolled(double mx, double my, double delta) {
+    @Override
+    public boolean mouseScrolled(double mx, double my, double delta) {
         scroll = Math.max(0, scroll - (int) (delta * 18));
         return true;
     }

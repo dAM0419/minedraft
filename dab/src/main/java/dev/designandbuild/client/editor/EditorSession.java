@@ -344,6 +344,28 @@ public final class EditorSession extends AreaEditorSession {
 
     /** 서버가 도면 전체를 다시 보냄 (순서가 어긋났을 때). */
     @Override
+    public boolean describeChunkRemoval(it.unimi.dsi.fastutil.longs.LongSet chunks, List<Component> lines) {
+        int cells = 0;
+        List<StructureInstance> touched = new ArrayList<>();
+        it.unimi.dsi.fastutil.longs.LongIterator it = chunks.iterator();
+        while (it.hasNext()) {
+            List<StructureInstance> t = new ArrayList<>();
+            cells += model.designCellsInChunk(it.nextLong(), t);
+            for (StructureInstance st : t) if (!touched.contains(st)) touched.add(st);
+        }
+        lines.add(Component.translatable("designandbuild.range.remove.cells", cells));
+        if (!touched.isEmpty()) {
+            StringBuilder b = new StringBuilder();
+            for (StructureInstance st : touched) {
+                if (b.length() > 0) b.append(", ");
+                b.append(st.name);
+            }
+            lines.add(Component.translatable("designandbuild.range.remove.structures", b.toString()));
+        }
+        return cells > 0 || !touched.isEmpty();
+    }
+
+    @Override
     protected void onAreaSwapped(Area newArea) {
         model = BlueprintModel.of(newArea);
         if (selected != 0 && model.structure(selected) == null) selected = 0;

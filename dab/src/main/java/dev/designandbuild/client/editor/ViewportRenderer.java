@@ -217,7 +217,7 @@ public final class ViewportRenderer {
                 if (st != null && st.bounds() != null) box(lines, ps, st.bounds(), tx, ty, tz, Ui.withAlpha(0xFFFFFF, 110));
             }
         }
-        int orderHover = screen.sidePanel.hoveredStructure();
+        int orderHover = screen.sidePanel.shownTab() == screen.orderTab ? screen.orderTab.hovered : 0;
         if (orderHover != 0) {
             StructureInstance st = s.model.structure(orderHover);
             if (st != null && st.bounds() != null) box(lines, ps, st.bounds(), tx, ty, tz, Ui.withAlpha(Ui.ACCENT, 230));

@@ -96,6 +96,17 @@ public abstract class AreaEditorSession implements ClientEditor {
     /** 사본이 통째로 바뀐 뒤 (모드가 층 참조를 갈아 끼운다). */
     protected void onAreaSwapped(Area newArea) {}
 
+    /**
+     * 범위 탭에서 이 청크들을 빼려 한다. 사라지는 것을 lines 에 적고, 하나라도 있으면 true (한 번 더 묻는다).
+     * 기본: 어느 층이든 내용이 있는 청크가 섞였으면 true (적는 줄은 없음).
+     */
+    public boolean describeChunkRemoval(it.unimi.dsi.fastutil.longs.LongSet chunks, List<Component> lines) {
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet used = area.usedChunks();
+        LongIterator it = chunks.iterator();
+        while (it.hasNext()) if (used.contains(it.nextLong())) return true;
+        return false;
+    }
+
 
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 

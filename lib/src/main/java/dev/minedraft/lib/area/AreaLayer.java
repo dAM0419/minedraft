@@ -27,4 +27,7 @@ public interface AreaLayer {
 
     /** 청크가 영역에서 빠졌다: 그 안의 데이터를 지우고 바뀐 칸을 알린다. */
     default void onChunkRemoved(long chunk) {}
+
+    /** 이 층이 내용을 가진 청크를 out 에 넣는다 (범위 탭의 "수정됨" 표시, 청크 제거 확인). */
+    default void collectUsedChunks(it.unimi.dsi.fastutil.longs.LongSet out) {}
 }

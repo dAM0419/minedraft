@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.PanelTab;
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.library.ClientLibrary;
@@ -36,7 +37,7 @@ import java.util.function.Predicate;
  * 칩 목록은 그 축의 태그 전부(숨긴 태그 제외)이고, 칩을 눌러도 다른 칩이 사라지지 않는다.
  * 숨긴 구조물·태그는 목록에서 빠지고, 조건에 맞는 숨김이 있으면 격자 아래에 개수를 보여 준다.
  */
-final class LibraryTab {
+public final class LibraryTab implements PanelTab {
     private static final int CELL = 46, CHIP_ROW = 12, MENU_ITEM = 14, NOTE_H = 14, CLEAR_H = 11;
 
     /** 태그와, 다른 조건을 지킨 채 이 태그를 더하면 나오는 구조물 수. */
@@ -73,7 +74,7 @@ final class LibraryTab {
     private double pressX, pressY;
     private int px, py, pw, ph;
 
-    LibraryTab(EditorScreen screen) {
+    public LibraryTab(EditorScreen screen) {
         this.screen = screen;
         this.search = new EditBox(Ui.font(), 0, 0, 100, 12, Component.empty());
         search.setBordered(false);
@@ -276,7 +277,18 @@ final class LibraryTab {
         return Math.max(0, contentHeight() - (py + ph - gridTop()));
     }
 
-    void render(GuiGraphics g, int x, int y, int w, int h, int mx, int my) {
+    @Override
+    public String title() {
+        return "designandbuild.panel.library";
+    }
+
+    @Override
+    public int icon() {
+        return Icons.LIBRARY;
+    }
+
+    @Override
+    public void render(GuiGraphics g, int x, int y, int w, int h, int mx, int my) {
         px = x;
         py = y;
         pw = w;
@@ -480,7 +492,8 @@ final class LibraryTab {
         g.pose().popPose();
     }
 
-    void renderTooltip() {
+    @Override
+    public void renderTooltip() {
     }
 
     private List<LibraryEntry> quickRow() {
@@ -539,7 +552,8 @@ final class LibraryTab {
         return i >= 0 && i < filtered.size() ? filtered.get(i) : null;
     }
 
-    boolean mouseClicked(double mx, double my, int button) {
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
         // 열려 있는 메뉴가 먼저
         if (menuEntry != null) {
             List<String> labels = menuLabels();
@@ -643,7 +657,8 @@ final class LibraryTab {
         return px + 2 + labelW + 2;
     }
 
-    boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (press != null && Math.abs(mx - pressX) + Math.abs(my - pressY) > 4) {
             screen.libraryDrag = press;
             press = null;
@@ -652,7 +667,8 @@ final class LibraryTab {
         return press != null;
     }
 
-    boolean mouseReleased(double mx, double my, int button) {
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
         if (press == null) return false;
         LibraryEntry e = press;
         press = null;
@@ -660,7 +676,8 @@ final class LibraryTab {
         return true;
     }
 
-    boolean mouseScrolled(double mx, double my, double delta) {
+    @Override
+    public boolean mouseScrolled(double mx, double my, double delta) {
         menuEntry = null;
         int cy = chipsTop();
         for (int axis = 0; axis < 3; axis++) {
