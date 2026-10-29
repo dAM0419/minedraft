@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
@@ -20,7 +21,7 @@ import java.util.List;
  * 클릭 = 재료를 그 블록 하나로, Shift+클릭 = 섞기 칸에 추가, 빈 칸 클릭 = 블록 선택기,
  * 칸끼리 끌어 순서 바꾸기, 바 밖으로 끌어내면 비우기.
  */
-public final class PaletteBar extends UiPart {
+public final class PaletteBar extends DabPart {
     public static final int SLOTS = 20, SLOT = 18;
     private int dragFrom = -1;
     private boolean dragged;

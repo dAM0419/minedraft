@@ -125,7 +125,7 @@ public final class Ui {
     }
 
     public static Component dirName(Direction d) {
-        return Component.translatable("designandbuild.dir." + d.getName());
+        return Component.translatable("minedraftlib.dir." + d.getName());
     }
 
     /** 방위 8방향 이름 (북·북동…). dx·dz 는 월드 기준. */
@@ -133,6 +133,6 @@ public final class Ui {
         double angle = Math.toDegrees(Math.atan2(dx, -dz));
         int idx = (int) Math.floor(((angle + 360 + 22.5) % 360) / 45.0);
         String[] keys = {"n", "ne", "e", "se", "s", "sw", "w", "nw"};
-        return Component.translatable("designandbuild.compass." + keys[idx]);
+        return Component.translatable("minedraftlib.compass." + keys[idx]);
     }
 }

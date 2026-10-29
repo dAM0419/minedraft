@@ -1,20 +1,23 @@
-package dev.designandbuild.client.editor.ui;
+package dev.minedraft.lib.client.editor.ui;
 
-import dev.designandbuild.client.editor.EditorScreen;
-import dev.designandbuild.client.editor.EditorSession;
+import dev.minedraft.lib.client.editor.AreaEditorScreen;
+import dev.minedraft.lib.client.editor.AreaEditorSession;
 import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.gui.GuiGraphics;
 
 /** 편집창 가장자리의 UI 조각 (상단 바, 툴바, 옵션 바, 패널…). */
-public abstract class UiPart {
-    protected final EditorScreen screen;
+/**
+ * @param <T> 이 조각이 붙는 편집창 (모드의 편집창 클래스)
+ */
+public abstract class UiPart<T extends AreaEditorScreen> {
+    protected final T screen;
     public int x, y, w, h;
 
-    protected UiPart(EditorScreen screen) {
+    protected UiPart(T screen) {
         this.screen = screen;
     }
 
-    protected EditorSession s() {
+    protected AreaEditorSession s() {
         return screen.session();
     }
 

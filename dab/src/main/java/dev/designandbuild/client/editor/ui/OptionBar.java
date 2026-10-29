@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.minedraft.lib.client.ui.NumberField;
 import dev.designandbuild.client.ui.TagColors;
 
@@ -31,7 +32,7 @@ import java.util.function.Supplier;
  * 하단 옵션 바: 고른 도구의 옵션만 한 줄로. 화면이 좁으면 두 줄로 접힌다.
  * 직접조작: 조작 4종 | 범위 형태 | 중심 | X·Y·Z | 비율 | 재료 3칸 | 태그 | 방향
  */
-public final class OptionBar extends UiPart {
+public final class OptionBar extends DabPart {
     private static final int ROW = 22;
     private static final int BTN = 16;
 

@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.library.ClientLibrary;
@@ -33,7 +34,7 @@ import java.util.function.Predicate;
  * 숨김 관리 창: 숨긴 구조물 / 숨긴 태그를 보고 하나씩 또는 모두 해제하고, 숨김 목록을 파일로 내보내거나 불러온다.
  * 이 컴퓨터에 없는 구조물·태그도 목록에는 흐리게 남는다.
  */
-final class HiddenDialog extends Modal {
+final class HiddenDialog extends Modal<EditorScreen> {
     private static final int W = 320, H = 236, ROW = 22, ROWS = 6;
 
     /** @param line 해제할 줄 (구조물 줄 또는 그 구조물을 숨기게 한 태그 줄) */

@@ -1,6 +1,6 @@
-package dev.designandbuild.client.editor.ui;
+package dev.minedraft.lib.client.editor.ui;
 
-import dev.designandbuild.client.editor.EditorScreen;
+import dev.minedraft.lib.client.editor.AreaEditorScreen;
 import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -12,13 +12,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** 편집창 위에 뜨는 창 (확인, 저장, 폴더 등록, 블록 선택). 떠 있는 동안 다른 입력을 받지 않는다. */
-public abstract class Modal {
-    protected final EditorScreen screen;
+public abstract class Modal<T extends AreaEditorScreen> {
+    protected final T screen;
     protected int x, y, w, h;
     /** 이 창의 입력칸들. 하나만 포커스를 가진다. */
     protected final List<EditBox> boxes = new ArrayList<>();
 
-    protected Modal(EditorScreen screen, int w, int h) {
+    protected Modal(T screen, int w, int h) {
         this.screen = screen;
         this.w = w;
         this.h = h;

@@ -170,7 +170,7 @@ final class RangeTab {
         Ui.icon(g, Icons.BLUEPRINT, (int) Math.round(bp[0]) - 8, (int) Math.round(bp[1]) - 8, 0xFFFFFFFF);
         // 북쪽 표시: 지도 가장자리, 실제 북쪽 방향
         double nx = Math.sin(angle) * (Math.min(mapW, mapH) / 2.0 - 7), ny = -Math.cos(angle) * (Math.min(mapW, mapH) / 2.0 - 7);
-        Component north = Component.translatable("designandbuild.compass.letter.north");
+        Component north = Component.translatable("minedraftlib.compass.letter.north");
         int nw = Ui.font().width(north);
         int lx = (int) Math.round(mapCX() + nx) - nw / 2, ly = (int) Math.round(mapCY() + ny) - 4;
         g.fill(lx - 2, ly - 2, lx + nw + 2, ly + 10, 0xC00B0E12);

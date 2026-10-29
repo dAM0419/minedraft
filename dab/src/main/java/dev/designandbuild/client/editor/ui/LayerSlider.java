@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
 import dev.minedraft.lib.client.ui.Icons;
@@ -21,7 +22,7 @@ import java.util.Locale;
  * 켜진 축마다 슬라이더가 하나씩 열려 깊이를 따로 정한다. 슬라이더 위쪽 = 더 드러남(숨긴 쪽 끝).
  * 테두리가 밝은 축이 조작 축(Shift+휠, Ctrl+클릭)이다. Y 단면에서 구조물이 선택돼 있으면 상대 층(2층 / 5층)으로 표시한다.
  */
-public final class LayerSlider extends UiPart {
+public final class LayerSlider extends DabPart {
     private static final Direction.Axis[] ORDER = {Direction.Axis.Y, Direction.Axis.X, Direction.Axis.Z};
     private static final int AXIS_Y0 = 56, AXIS_H = 14, TRACKS_Y0 = AXIS_Y0 + 3 * (AXIS_H + 2) + 4;
     /** 슬라이더 하나의 머리(축 글자) 높이와 사이 간격. */

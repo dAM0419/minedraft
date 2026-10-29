@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.library.ClientLibrary;
@@ -21,7 +22,7 @@ import java.util.Map;
  * 구조물 폴더 등록 창. 등록한 폴더 안의 .nbt 가 내 라이브러리에 나온다 (하위 폴더 포함).
  * 이 목록은 내 클라이언트 설정에만 저장된다.
  */
-public final class FolderDialog extends Modal {
+public final class FolderDialog extends Modal<EditorScreen> {
     private static final int ROW = 18, MAX_ROWS = 6;
 
     private final EditBox path;

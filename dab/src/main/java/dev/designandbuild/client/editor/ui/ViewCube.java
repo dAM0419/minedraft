@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.UiPart;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.minedraft.lib.client.editor.EditorCamera;
 import dev.designandbuild.client.editor.EditorScreen;
@@ -23,7 +24,7 @@ import java.util.List;
  * 칸은 방향 벡터 (sx, sy, sz) ∈ {-1, 0, 1}³ 로 구분한다. 면 하나를 3×3 으로 나눠, 가운데 = 면, 가장자리 = 모서리, 귀퉁이 = 꼭짓점.
  * 시점: 윗면 = 바로 위, 옆면·세로 모서리 = 정면(0°), 위 모서리 = 45°, 위 꼭짓점 = 30° (기본 쿼터뷰와 같은 기울기).
  */
-public final class ViewCube extends UiPart {
+public final class ViewCube extends DabPart {
     /** 정육면체 반 변 길이 (화면 픽셀). */
     private static final float HALF = 17.0F;
     /** 모서리·꼭짓점 띠의 두께 (반 변 대비). */

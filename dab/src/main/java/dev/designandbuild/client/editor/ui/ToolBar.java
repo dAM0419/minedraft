@@ -1,5 +1,8 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.UiPart;
+import dev.minedraft.lib.client.LibConfig;
+
 import dev.minedraft.lib.edit.EditRequests;
 
 import dev.designandbuild.client.ClientConfig;
@@ -14,7 +17,7 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 /** 좌측 툴바: 도구 3개(선택·직접조작·배치), 아래에 도움말·태그 보기·블록 테두리·되돌리기·다시 하기. */
-public final class ToolBar extends UiPart {
+public final class ToolBar extends DabPart {
     private static final int B = 18;
 
     public ToolBar(EditorScreen screen) {
@@ -48,7 +51,7 @@ public final class ToolBar extends UiPart {
         }
         int[] bottom = {Icons.REDO, Icons.UNDO, Icons.GRID, Icons.TAGS, Icons.HELP};
         String[] tips = {"designandbuild.editor.redo", "designandbuild.editor.undo", "designandbuild.editor.outlines", "designandbuild.editor.tag_view", "designandbuild.editor.help"};
-        boolean[] active = {false, false, ClientConfig.get().blockOutlines, screen.tagView, screen.showHelp};
+        boolean[] active = {false, false, LibConfig.get().blockOutlines, screen.tagView, screen.showHelp};
         for (int i = 0; i < bottom.length; i++) {
             int by = bottomY(i);
             boolean hover = Ui.inside(mx, my, x + 2, by, B, B);

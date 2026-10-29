@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.library.HiddenList;
 import dev.minedraft.lib.client.ui.Ui;
@@ -18,7 +19,7 @@ import java.util.Locale;
  * 전체 태그 창: 한 축(출처·종류·지형)의 태그를 칩 격자로 모두 보여 주고 여러 개를 이어서 고른다.
  * 창이 열린 채 뒤의 라이브러리 결과가 바로 바뀐다 (배경을 어둡게 하지 않고, 패널 왼쪽에 둔다).
  */
-final class TagPicker extends Modal {
+final class TagPicker extends Modal<EditorScreen> {
     private static final int W = 232, H = 176, CHIP_H = 14, GAP = 3;
 
     private final LibraryTab tab;

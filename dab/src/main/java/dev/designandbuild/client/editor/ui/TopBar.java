@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.minedraft.lib.client.editor.EditorColors;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
@@ -22,7 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /** 상단 바: 도면 이름·저장 상태 | 편집 중인 사람 | 나침반·회전·닫기. */
-public final class TopBar extends UiPart {
+public final class TopBar extends DabPart {
     private final List<int[]> faceBoxes = new ArrayList<>();
     private final List<UUID> faceIds = new ArrayList<>();
 
@@ -99,7 +100,7 @@ public final class TopBar extends UiPart {
             float len = (float) Math.sqrt(dx * dx + dy * dy);
             if (len < 1e-3) continue;
             int lx = cx + Math.round(dx / len * 6), ly = cy + Math.round(dy / len * 6);
-            String letter = Component.translatable("designandbuild.compass.letter." + d.getName()).getString();
+            String letter = Component.translatable("minedraftlib.compass.letter." + d.getName()).getString();
             int color = d == Direction.NORTH ? Ui.DEMOLISH : Ui.DIM;
             g.drawString(Ui.font(), letter, lx - Ui.font().width(letter) / 2, ly - 4, color, false);
         }

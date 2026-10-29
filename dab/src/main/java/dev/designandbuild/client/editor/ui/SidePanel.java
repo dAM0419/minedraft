@@ -1,5 +1,8 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.UiPart;
+import dev.minedraft.lib.client.LibConfig;
+
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.minedraft.lib.client.ui.Icons;
@@ -13,7 +16,7 @@ import java.util.List;
  * 우측 패널: 라이브러리 · 순서 · 범위 탭 (한 번에 하나만). Tab 으로 접는다.
  * 화면이 좁아 자동으로 접혔을 때는 아이콘 세로줄이 되고, 누르면 뷰포트 위에 겹쳐 열린다.
  */
-public final class SidePanel extends UiPart {
+public final class SidePanel extends DabPart {
     public static final int WIDTH = 156, STRIP = 18, HEADER = 18;
 
     private int tab;
@@ -114,7 +117,7 @@ public final class SidePanel extends UiPart {
                     if (screen.panelAutoCollapsed) {
                         overlayOpen = !(overlayOpen && tab == i);
                     } else {
-                        ClientConfig.get().panelCollapsed = false;
+                        LibConfig.get().panelCollapsed = false;
                     }
                     tab = i;
                     return true;
@@ -127,7 +130,7 @@ public final class SidePanel extends UiPart {
             if (collapsed) {
                 overlayOpen = false;
             } else {
-                ClientConfig.get().panelCollapsed = true;
+                LibConfig.get().panelCollapsed = true;
             }
             return true;
         }

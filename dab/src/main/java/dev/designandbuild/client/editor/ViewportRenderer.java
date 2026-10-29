@@ -1,5 +1,8 @@
 package dev.designandbuild.client.editor;
 
+import dev.minedraft.lib.client.LibConfig;
+
+import dev.minedraft.lib.client.editor.EditorRenderer;
 import dev.minedraft.lib.client.editor.EditorColors;
 import dev.minedraft.lib.client.editor.EditorCamera;
 import dev.designandbuild.client.ui.TagColors;
@@ -83,7 +86,7 @@ public final class ViewportRenderer {
         try {
             boolean bubble = s.cutActive && s.bubble && screen.inViewport(mx, my);
             if (bubble) {
-                int r = ClientConfig.get().bubbleRadius;
+                int r = LibConfig.get().bubbleRadius;
                 disc(s, mx, my, r, true);
                 s.renderer.draw(EditorRenderer.Pass.UPPER, rot, proj);
                 disc(s, mx, my, r, false);

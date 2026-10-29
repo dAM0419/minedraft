@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
 import dev.minedraft.lib.client.ui.Ui;
@@ -24,7 +25,7 @@ public final class Dialogs {
     private Dialogs() {}
 
     /** 일반 확인 창. danger 면 Enter 로는 확인되지 않고, 취소가 기본 선택이다. */
-    public static final class Confirm extends Modal {
+    public static final class Confirm extends Modal<EditorScreen> {
         private final Component title;
         private final List<Component> lines;
         @Nullable

@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.library.ClientLibrary;
@@ -30,7 +31,7 @@ import java.util.Map;
  * 구조물 저장 창: 이름, 저장 폴더와 파일 이름, 설치면, 태그(출처·종류·지형, 고르거나 새로 추가).
  * 저장하면 내 폴더에 .nbt 로 남고 바로 내 라이브러리에 나온다 (다른 플레이어에게는 보이지 않는다).
  */
-public final class SaveDialog extends Modal {
+public final class SaveDialog extends Modal<EditorScreen> {
     private static final Direction[] MOUNTS = {Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
     private static final int LABEL_W = 56;
 

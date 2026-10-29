@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** 클라이언트 설정 (config/designandbuild-client.json). 플레이어별로 남는 것만 둔다. */
+/** DaB 클라이언트 설정 (config/designandbuild-client.json). 편집창 공용 설정은 Minedraft Lib 의 LibConfig. */
 public final class ClientConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static Data data = new Data();
@@ -30,12 +30,8 @@ public final class ClientConfig {
         public List<String> palette = new ArrayList<>();
         public List<String> recent = new ArrayList<>();
         public List<String> favorites = new ArrayList<>();
-        /** 블록 선택기에서 최근에 고른 블록. */
-        public List<String> recentBlocks = new ArrayList<>();
         /** 이 블록 수를 넘는 조작은 한 번 더 눌러야 적용된다. */
         public int largeOpThreshold = 20000;
-        /** 커서 버블 반지름 (GUI 픽셀). */
-        public int bubbleRadius = 56;
         /** 투영 HUD 위치 조정 (다른 HUD 모드와 겹칠 때). */
         public int progressOffsetX = 0, progressOffsetY = 0;
         public int materialsOffsetX = 0, materialsOffsetY = 0;
@@ -48,9 +44,6 @@ public final class ClientConfig {
         /** 도면별: 투영을 끈 도면. */
         public Set<String> projectionOff = new HashSet<>();
         public boolean paletteCollapsed = false;
-        public boolean panelCollapsed = false;
-        /** 편집창: 블록 테두리 선 (G). */
-        public boolean blockOutlines = true;
         /** 투영 블록 불투명도 (%, 30~80). 투영 전체를 한 장으로 그린 뒤 이 값으로 덮는다. */
         public int projectionOpacity = 55;
     }
@@ -83,7 +76,6 @@ public final class ClientConfig {
         if (data.palette == null) data.palette = new ArrayList<>();
         if (data.recent == null) data.recent = new ArrayList<>();
         if (data.favorites == null) data.favorites = new ArrayList<>();
-        if (data.recentBlocks == null) data.recentBlocks = new ArrayList<>();
         if (data.layerBelow == null) data.layerBelow = new HashMap<>();
         if (data.layerAll == null) data.layerAll = new HashSet<>();
         if (data.hidden == null) data.hidden = new java.util.LinkedHashSet<>();

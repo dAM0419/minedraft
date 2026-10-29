@@ -1,5 +1,8 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.editor.ui.Modal;
+import dev.minedraft.lib.client.LibConfig;
+
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
@@ -35,7 +38,7 @@ import java.util.Set;
  * 없으면 크리에이티브 인벤토리처럼 탭 + 검색 격자를 띄운다.
  * 설치할 수 있는 것(블록 아이템, 액체 양동이)만 보인다.
  */
-public final class BlockPicker extends Modal {
+public final class BlockPicker extends Modal<EditorScreen> {
     public enum Kind { PALETTE, MATERIAL, REPLACE_TARGET }
 
     public record Target(Kind kind, int index) {}
@@ -133,7 +136,7 @@ public final class BlockPicker extends Modal {
 
     private List<ItemStack> recent() {
         List<ItemStack> out = new ArrayList<>();
-        for (String id : ClientConfig.get().recentBlocks) {
+        for (String id : LibConfig.get().recentBlocks) {
             ResourceLocation rl = ResourceLocation.tryParse(id);
             if (rl == null) continue;
             Item item = BuiltInRegistries.ITEM.get(rl);
@@ -400,11 +403,11 @@ public final class BlockPicker extends Modal {
             if (s.weights[i] <= 0) s.weights[i] = 1;
         }
         String id = BuiltInRegistries.ITEM.getKey(st.getItem()).toString();
-        List<String> rec = ClientConfig.get().recentBlocks;
+        List<String> rec = LibConfig.get().recentBlocks;
         rec.remove(id);
         rec.add(0, id);
         while (rec.size() > 28) rec.remove(rec.size() - 1);
-        ClientConfig.save();
+        LibConfig.save();
         close();
     }
 

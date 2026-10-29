@@ -1,4 +1,4 @@
-package dev.designandbuild.client.editor;
+package dev.minedraft.lib.client.editor;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -22,10 +22,10 @@ import org.jetbrains.annotations.Nullable;
  * 조명은 항상 최대 밝기, 면 음영은 바닐라와 같다.
  */
 public final class EditorWorld implements BlockAndTintGetter {
-    private final EditorSession session;
+    private final AreaEditorSession session;
     private final boolean hideCut;
 
-    public EditorWorld(EditorSession session, boolean hideCut) {
+    public EditorWorld(AreaEditorSession session, boolean hideCut) {
         this.session = session;
         this.hideCut = hideCut;
     }
@@ -48,12 +48,12 @@ public final class EditorWorld implements BlockAndTintGetter {
 
     @Override
     public int getHeight() {
-        return session.model.maxY - session.model.minY;
+        return session.area.maxY - session.area.minY;
     }
 
     @Override
     public int getMinBuildHeight() {
-        return session.model.minY;
+        return session.area.minY;
     }
 
     @Override

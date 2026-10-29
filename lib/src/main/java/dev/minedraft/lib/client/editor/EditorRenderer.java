@@ -1,10 +1,11 @@
-package dev.designandbuild.client.editor;
+package dev.minedraft.lib.client.editor;
+
+import dev.minedraft.lib.client.LibConfig;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.mojang.blaze3d.vertex.VertexBuffer;
-import dev.designandbuild.client.ClientConfig;
 import dev.minedraft.lib.client.render.LibRenderTypes;
 import dev.minedraft.lib.client.render.BlockMesher;
 import dev.minedraft.lib.client.render.EdgeMesher;
@@ -87,14 +88,14 @@ public final class EditorRenderer implements AutoCloseable {
         }
     }
 
-    private final EditorSession s;
+    private final AreaEditorSession s;
     private final BlockMesher mesher = new BlockMesher();
     private final EdgeMesher edger = new EdgeMesher();
     private final Long2ObjectOpenHashMap<Entry> entries = new Long2ObjectOpenHashMap<>();
     private final LongLinkedOpenHashSet dirty = new LongLinkedOpenHashSet();
     private int built, total;
 
-    public EditorRenderer(EditorSession session) {
+    public EditorRenderer(AreaEditorSession session) {
         this.s = session;
     }
 
@@ -105,8 +106,8 @@ public final class EditorRenderer implements AutoCloseable {
     public void markAll() {
         List<long[]> keys = new ArrayList<>();
         int minSec = SectionPos.blockToSectionCoord(s.renderMinY);
-        int maxSec = SectionPos.blockToSectionCoord(s.model.maxY - 1);
-        LongIterator it = s.model.chunks().iterator();
+        int maxSec = SectionPos.blockToSectionCoord(s.area.maxY - 1);
+        LongIterator it = s.area.chunks().iterator();
         while (it.hasNext()) {
             long c = it.nextLong();
             if (!s.snapshot.has(c)) continue;
@@ -122,7 +123,7 @@ public final class EditorRenderer implements AutoCloseable {
         // 영역 밖이 된 섹션은 버린다
         LongArrayList gone = new LongArrayList();
         for (long key : entries.keySet()) {
-            if (!s.model.hasChunk(SectionPos.x(key), SectionPos.z(key)) || SectionPos.y(key) < minSec) gone.add(key);
+            if (!s.area.hasChunk(SectionPos.x(key), SectionPos.z(key)) || SectionPos.y(key) < minSec) gone.add(key);
         }
         for (long key : gone) {
             Entry e = entries.remove(key);
@@ -147,8 +148,8 @@ public final class EditorRenderer implements AutoCloseable {
     }
 
     private void mark(int sx, int sy, int sz) {
-        if (!s.model.hasChunk(sx, sz)) return;
-        if (sy < SectionPos.blockToSectionCoord(s.renderMinY) || sy > SectionPos.blockToSectionCoord(s.model.maxY - 1)) return;
+        if (!s.area.hasChunk(sx, sz)) return;
+        if (sy < SectionPos.blockToSectionCoord(s.renderMinY) || sy > SectionPos.blockToSectionCoord(s.area.maxY - 1)) return;
         dirty.add(SectionPos.asLong(sx, sy, sz));
     }
 
@@ -156,13 +157,13 @@ public final class EditorRenderer implements AutoCloseable {
     public void markChunkArea(long chunk) {
         int cx = ChunkPos.getX(chunk), cz = ChunkPos.getZ(chunk);
         int minSec = SectionPos.blockToSectionCoord(s.renderMinY);
-        int maxSec = SectionPos.blockToSectionCoord(s.model.maxY - 1);
+        int maxSec = SectionPos.blockToSectionCoord(s.area.maxY - 1);
         int[][] offs = {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
         for (int[] o : offs) {
             int x = cx + o[0], z = cz + o[1];
             for (int sy = minSec; sy <= maxSec; sy++) {
                 long key = SectionPos.asLong(x, sy, z);
-                if (s.model.hasChunk(x, z) && s.snapshot.has(ChunkPos.asLong(x, z))) {
+                if (s.area.hasChunk(x, z) && s.snapshot.has(ChunkPos.asLong(x, z))) {
                     dirty.add(key);
                 } else {
                     Entry e = entries.remove(key);
@@ -304,7 +305,7 @@ public final class EditorRenderer implements AutoCloseable {
             }
             if (begun) MeshDraw.endLayer(BlockMesher.layerType(layer));
         }
-        if (ClientConfig.get().blockOutlines) drawEdges(visible, pass, rotation, projection);
+        if (LibConfig.get().blockOutlines) drawEdges(visible, pass, rotation, projection);
         drawDynamic(meshes, pass);
     }
 
@@ -354,8 +355,8 @@ public final class EditorRenderer implements AutoCloseable {
 
     /** 테두리 선의 영역 가장자리 주인 판정용: 이 섹션이 그려지는 범위 안인가. */
     private boolean sectionExists(int sx, int sy, int sz) {
-        return s.model.hasChunk(sx, sz) && sy >= SectionPos.blockToSectionCoord(s.renderMinY)
-                && sy <= SectionPos.blockToSectionCoord(s.model.maxY - 1);
+        return s.area.hasChunk(sx, sz) && sy >= SectionPos.blockToSectionCoord(s.renderMinY)
+                && sy <= SectionPos.blockToSectionCoord(s.area.maxY - 1);
     }
 
     private VertexBuffer pickEdges(Entry e, Pass pass) {

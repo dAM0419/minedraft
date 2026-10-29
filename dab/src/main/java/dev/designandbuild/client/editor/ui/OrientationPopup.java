@@ -246,7 +246,7 @@ public final class OrientationPopup {
             boolean hv = Ui.inside(mx, my, bx, by, 12, 12);
             g.fill(bx, by, bx + 12, by + 12, on ? 0xFF1F6F68 : hv ? 0xFF2A323D : 0xFF161B22);
             Ui.border(g, bx, by, 12, 12, on ? Ui.ACCENT : Ui.EDGE);
-            String letter = Component.translatable("designandbuild.compass.letter." + d.getName()).getString();
+            String letter = Component.translatable("minedraftlib.compass.letter." + d.getName()).getString();
             Ui.text(g, letter, bx + 6 - Ui.font().width(letter) / 2 + 1, by + 2, d == Direction.NORTH ? 0xFFFF7A7A : Ui.TEXT);
             if (hv) screen.tooltip = List.of(Component.translatable("designandbuild.orientation.look_dir", Ui.dirName(d)));
         }
