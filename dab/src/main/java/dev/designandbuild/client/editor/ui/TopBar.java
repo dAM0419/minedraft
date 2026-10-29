@@ -1,10 +1,10 @@
 package dev.designandbuild.client.editor.ui;
 
-import dev.designandbuild.client.editor.EditorColors;
+import dev.minedraft.lib.client.editor.EditorColors;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
-import dev.designandbuild.client.ui.Icons;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Icons;
+import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;

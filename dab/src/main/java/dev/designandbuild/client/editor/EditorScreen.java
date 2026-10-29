@@ -16,8 +16,8 @@ import dev.designandbuild.client.editor.ui.UiPart;
 import dev.designandbuild.client.library.ClientLibrary;
 import dev.designandbuild.client.library.LibraryEntry;
 import dev.designandbuild.client.ui.Thumbnails;
-import dev.designandbuild.client.ui.Ui;
-import dev.designandbuild.core.Box;
+import dev.minedraft.lib.client.ui.Ui;
+import dev.minedraft.lib.util.Box;
 import dev.designandbuild.core.Requests;
 import dev.designandbuild.core.StructureInstance;
 import dev.designandbuild.core.TemplateData;
@@ -274,7 +274,7 @@ public final class EditorScreen extends Screen {
         if (libraryDrag != null) {
             TemplateData t = ClientLibrary.template(libraryDrag);
             if (t == null || !Thumbnails.draw(g, t, mx - 16, my - 16, 32, 32, 45, 400)) {
-                Ui.icon(g, dev.designandbuild.client.ui.Icons.PLACE, mx - 8, my - 8, Ui.TEXT);
+                Ui.icon(g, dev.minedraft.lib.client.ui.Icons.PLACE, mx - 8, my - 8, Ui.TEXT);
             }
         }
         if (tooltip != null && !tooltip.isEmpty()) {
@@ -401,15 +401,15 @@ public final class EditorScreen extends Screen {
         /** 빠진 칸 수: 다른 구조물 소속 / 채우기인데 이미 찬 칸. */
         public int skippedForeign, skippedOccupied;
         @Nullable
-        public dev.designandbuild.client.render.BlockMesher.Mesh ghost;
+        public dev.minedraft.lib.client.render.BlockMesher.Mesh ghost;
         public int ghostOx, ghostOy, ghostOz;
         @Nullable
         public ToolLogic.Placement placement;
         @Nullable
-        public dev.designandbuild.client.render.BlockMesher.Mesh placementGhost;
+        public dev.minedraft.lib.client.render.BlockMesher.Mesh placementGhost;
         @Nullable
         private ToolLogic.Transformed placementShape;
-        private final dev.designandbuild.client.render.BlockMesher mesher = new dev.designandbuild.client.render.BlockMesher();
+        private final dev.minedraft.lib.client.render.BlockMesher mesher = new dev.minedraft.lib.client.render.BlockMesher();
 
         public void update() {
             EditorSession.Hit h = hover;
@@ -441,7 +441,7 @@ public final class EditorScreen extends Screen {
                     ghostOz = region.minZ();
                     List<BlockPos> list = new ArrayList<>();
                     for (long p : cells.keySet()) list.add(BlockPos.of(p));
-                    ghost = mesher.build(new dev.designandbuild.client.library.MapWorld(cells, s.model.minY, s.model.maxY - s.model.minY),
+                    ghost = mesher.build(new dev.minedraft.lib.client.render.MapWorld(cells, s.model.minY, s.model.maxY - s.model.minY),
                             list.iterator(), ghostOx, ghostOy, ghostOz, 0.6F, true);
                 }
             }
@@ -486,7 +486,7 @@ public final class EditorScreen extends Screen {
                         map.put(p.asLong(), tr.states()[i]);
                         list.add(p);
                     }
-                    placementGhost = mesher.build(new dev.designandbuild.client.library.MapWorld(map, -64, 512), list.iterator(),
+                    placementGhost = mesher.build(new dev.minedraft.lib.client.render.MapWorld(map, -64, 512), list.iterator(),
                             0, 0, 0, 0.55F, true);
                 }
             }

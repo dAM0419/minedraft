@@ -1,4 +1,4 @@
-package dev.designandbuild.core;
+package dev.minedraft.lib.util;
 
 import net.minecraft.core.BlockPos;
 

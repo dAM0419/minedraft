@@ -3,7 +3,7 @@ package dev.designandbuild.client.editor.ui;
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;

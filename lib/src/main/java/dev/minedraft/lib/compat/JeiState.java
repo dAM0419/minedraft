@@ -1,4 +1,4 @@
-package dev.designandbuild.compat;
+package dev.minedraft.lib.compat;
 
 import net.minecraft.world.item.ItemStack;
 

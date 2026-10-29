@@ -1,4 +1,4 @@
-package dev.designandbuild.client.editor;
+package dev.minedraft.lib.client.editor;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.Holder;

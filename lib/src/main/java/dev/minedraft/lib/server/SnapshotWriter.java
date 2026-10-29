@@ -1,6 +1,6 @@
-package dev.designandbuild.server;
+package dev.minedraft.lib.server;
 
-import dev.designandbuild.net.Net;
+import dev.minedraft.lib.net.Channel;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.core.Holder;
@@ -59,7 +59,7 @@ public final class SnapshotWriter {
             biomeData[i] = b;
         }
 
-        return Net.encode(buf -> {
+        return Channel.encode(buf -> {
             buf.writeUUID(blueprint);
             buf.writeLong(chunkLong);
             buf.writeVarInt(level.getMinSection());

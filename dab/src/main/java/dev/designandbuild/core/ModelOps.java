@@ -1,5 +1,6 @@
 package dev.designandbuild.core;
 
+import dev.minedraft.lib.util.CellIO;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.block.Mirror;
@@ -30,7 +31,7 @@ public final class ModelOps {
         return switch (kind) {
             case TERRAIN -> {
                 long[] pos = CellIO.readPositions(buf, MAX_CELLS);
-                yield new Terrain(pos, CellIO.readStates(buf, pos.length), CellIO.readTags(buf, pos.length));
+                yield new Terrain(pos, CellIO.readStates(buf, pos.length), DesignTag.readAll(buf, pos.length));
             }
             case STRUCT_CREATE -> {
                 int id = buf.readVarInt();
@@ -82,7 +83,7 @@ public final class ModelOps {
             buf.writeByte(TERRAIN);
             CellIO.writePositions(buf, pos);
             CellIO.writeStates(buf, states);
-            CellIO.writeTags(buf, tags);
+            DesignTag.writeAll(buf, tags);
         }
     }
 

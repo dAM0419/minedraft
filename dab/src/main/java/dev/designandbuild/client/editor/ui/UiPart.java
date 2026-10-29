@@ -2,7 +2,7 @@ package dev.designandbuild.client.editor.ui;
 
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.gui.GuiGraphics;
 
 /** 편집창 가장자리의 UI 조각 (상단 바, 툴바, 옵션 바, 패널…). */

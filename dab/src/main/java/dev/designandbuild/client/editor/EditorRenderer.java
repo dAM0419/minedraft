@@ -5,11 +5,11 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import dev.designandbuild.client.ClientConfig;
-import dev.designandbuild.client.render.DabRenderTypes;
-import dev.designandbuild.client.render.BlockMesher;
-import dev.designandbuild.client.render.EdgeMesher;
-import dev.designandbuild.client.render.MeshDraw;
-import dev.designandbuild.core.Box;
+import dev.minedraft.lib.client.render.LibRenderTypes;
+import dev.minedraft.lib.client.render.BlockMesher;
+import dev.minedraft.lib.client.render.EdgeMesher;
+import dev.minedraft.lib.client.render.MeshDraw;
+import dev.minedraft.lib.util.Box;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -334,7 +334,7 @@ public final class EditorRenderer implements AutoCloseable {
             VertexBuffer vb = pickEdges(e, pass);
             if (vb == null) continue;
             if (!begun) {
-                DabRenderTypes.OUTLINE_LINES.setupRenderState();
+                LibRenderTypes.OUTLINE_LINES.setupRenderState();
                 RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alpha);
                 begun = true;
             }
@@ -348,7 +348,7 @@ public final class EditorRenderer implements AutoCloseable {
         if (begun) {
             VertexBuffer.unbind();
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-            DabRenderTypes.OUTLINE_LINES.clearRenderState();
+            LibRenderTypes.OUTLINE_LINES.clearRenderState();
         }
     }
 

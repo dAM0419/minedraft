@@ -1,7 +1,6 @@
-package dev.designandbuild.client.ui;
+package dev.minedraft.lib.client.ui;
 
-import dev.designandbuild.DesignAndBuild;
-import dev.designandbuild.core.DesignTag;
+import dev.minedraft.lib.MinedraftLib;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -19,7 +18,7 @@ import java.util.List;
 public final class Ui {
     private Ui() {}
 
-    public static final ResourceLocation ICONS = DesignAndBuild.rl("textures/gui/icons.png");
+    public static final ResourceLocation ICONS = MinedraftLib.rl("textures/gui/icons.png");
     public static final int ICON_TEX_W = 256, ICON_TEX_H = 64;
 
     // ---- 패널 ----
@@ -47,15 +46,6 @@ public final class Ui {
 
     public static Font font() {
         return Minecraft.getInstance().font;
-    }
-
-    public static int tagColor(DesignTag tag) {
-        return switch (tag) {
-            case FLOOR -> FLOOR;
-            case PATH -> PATH;
-            case STRUCTURE -> STRUCTURE;
-            default -> DEMOLISH;
-        };
     }
 
     public static int withAlpha(int color, int alpha) {

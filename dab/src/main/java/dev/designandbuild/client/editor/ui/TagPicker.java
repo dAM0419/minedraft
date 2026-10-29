@@ -2,7 +2,7 @@ package dev.designandbuild.client.editor.ui;
 
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.library.HiddenList;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Ui;
 import dev.designandbuild.core.TemplateParser;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;

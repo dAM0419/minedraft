@@ -4,7 +4,7 @@ package dev.designandbuild.net;
 public final class Msg {
     private Msg() {}
 
-    public static final int PART = 0;
+    /** 0 은 조각 (Channel.PART) 으로 예약. */
 
     // ---- 클라이언트 → 서버 ----
     public static final int C_OPEN_EDITOR = 1;

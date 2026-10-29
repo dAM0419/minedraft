@@ -6,7 +6,7 @@ import dev.designandbuild.client.library.ClientLibrary;
 import dev.designandbuild.client.library.HiddenList;
 import dev.designandbuild.client.library.LibraryEntry;
 import dev.designandbuild.client.ui.Thumbnails;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Ui;
 import dev.designandbuild.core.TemplateData;
 import dev.designandbuild.core.TemplateParser;
 import net.minecraft.Util;

@@ -1,12 +1,15 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.client.ui.NumberField;
+import dev.designandbuild.client.ui.TagColors;
+
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
 import dev.designandbuild.client.editor.PlacementStates;
 import dev.designandbuild.client.library.ClientLibrary;
-import dev.designandbuild.client.ui.Icons;
+import dev.minedraft.lib.client.ui.Icons;
 import dev.designandbuild.client.ui.Thumbnails;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Ui;
 import dev.designandbuild.core.DesignTag;
 import dev.designandbuild.core.Requests;
 import dev.designandbuild.core.StructureInstance;
@@ -217,7 +220,7 @@ public final class OptionBar extends UiPart {
             StructureInstance editing = s.selected != 0 ? s.model.structure(s.selected) : null;
             if (editing != null) {
                 // 구조물 선택 중: 모든 조작이 그 구조물에 쓰이므로 태그 대신 대상 구조물을 보여 준다
-                items.add(new Item(BTN + 2, (g, x, y, h) -> Ui.icon(g, Icons.TAG_STRUCTURE, x + 1, y + 3, Ui.tagColor(DesignTag.STRUCTURE)),
+                items.add(new Item(BTN + 2, (g, x, y, h) -> Ui.icon(g, Icons.TAG_STRUCTURE, x + 1, y + 3, TagColors.tagColor(DesignTag.STRUCTURE)),
                         b -> {}, null, () -> List.of(Component.translatable("designandbuild.editing.tag_locked"))));
                 label(Ui.clip(editing.name, 110), Ui.TEXT);
                 iconButton(Icons.X_SMALL, () -> false, () -> s.selected = 0, "designandbuild.select.deselect", "Esc");
@@ -230,8 +233,8 @@ public final class OptionBar extends UiPart {
                 items.add(new Item(BTN + 2, (g, x, y, h) -> {
                     boolean active = s.tag == t;
                     if (h) g.fill(x, y + 2, x + BTN + 2, y + BTN + 4, Ui.HOVER);
-                    if (active) g.fill(x + 2, y + BTN + 2, x + BTN, y + BTN + 3, Ui.tagColor(t));
-                    Ui.icon(g, icon, x + 1, y + 3, active ? Ui.tagColor(t) : Ui.withAlpha(Ui.tagColor(t), 140));
+                    if (active) g.fill(x + 2, y + BTN + 2, x + BTN, y + BTN + 3, TagColors.tagColor(t));
+                    Ui.icon(g, icon, x + 1, y + 3, active ? TagColors.tagColor(t) : Ui.withAlpha(TagColors.tagColor(t), 140));
                 }, b -> s.tag = t, null, () -> List.of(Component.translatable("designandbuild.tag." + t.key()),
                         Component.translatable("designandbuild.tag." + t.key() + ".tip").withStyle(st -> st.withColor(Ui.DIM & 0xFFFFFF)))));
             }

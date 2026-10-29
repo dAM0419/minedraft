@@ -1,6 +1,6 @@
-package dev.designandbuild.client.editor.ui;
+package dev.minedraft.lib.client.ui;
 
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;

@@ -19,11 +19,11 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import dev.designandbuild.client.library.MapWorld;
-import dev.designandbuild.client.render.DabRenderTypes;
-import dev.designandbuild.client.render.BlockMesher;
-import dev.designandbuild.client.render.MeshDraw;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.render.MapWorld;
+import dev.minedraft.lib.client.render.LibRenderTypes;
+import dev.minedraft.lib.client.render.BlockMesher;
+import dev.minedraft.lib.client.render.MeshDraw;
+import dev.minedraft.lib.client.ui.Ui;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -313,9 +313,9 @@ public final class ProjectionRenderer {
         float opacity = Mth.clamp(ClientConfig.get().projectionOpacity, 30, 80) / 100.0F;
         drawGhostsComposited(visible, view, proj, cam, opacity);
         // 빨간·청색 필터
-        drawBuffers(DabRenderTypes.QUADS, visible, view, proj, cam, 1);
+        drawBuffers(LibRenderTypes.QUADS, visible, view, proj, cam, 1);
         // 외곽선 (방향 틀림)
-        drawBuffers(DabRenderTypes.LINES, visible, view, proj, cam, 0);
+        drawBuffers(LibRenderTypes.LINES, visible, view, proj, cam, 0);
         // 망치 조준
         if (target != null) drawTargetBox(target, view, proj, cam);
     }
@@ -434,7 +434,7 @@ public final class ProjectionRenderer {
             if (vb == null) return;
             TARGET_BOX[which] = vb;
         }
-        DabRenderTypes.LINES.setupRenderState();
+        LibRenderTypes.LINES.setupRenderState();
         ShaderInstance shader = RenderSystem.getShader();
         if (shader != null) {
             Matrix4f mv = new Matrix4f(view).translate((float) (p.getX() - cam.x), (float) (p.getY() - cam.y), (float) (p.getZ() - cam.z));
@@ -442,7 +442,7 @@ public final class ProjectionRenderer {
             vb.drawWithShader(mv, proj, shader);
             VertexBuffer.unbind();
         }
-        DabRenderTypes.LINES.clearRenderState();
+        LibRenderTypes.LINES.clearRenderState();
     }
 
     private static void drawBuffers(RenderType type, List<SectionVisual> visible, Matrix4f view, Matrix4f proj, Vec3 cam,

@@ -1,4 +1,4 @@
-package dev.designandbuild.client.ui;
+package dev.minedraft.lib.client.ui;
 
 /** 아이콘 아틀라스(textures/gui/icons.png, 16×16 칸) 번호. */
 public final class Icons {

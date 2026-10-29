@@ -1,5 +1,6 @@
 package dev.designandbuild.core;
 
+import dev.minedraft.lib.util.Box;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;

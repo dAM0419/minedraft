@@ -23,7 +23,7 @@ public final class ServerNet {
 
     private static final double REACH_SQR = 8 * 8;
 
-    public static void receive(ServerPlayer player, Net.Frame frame) {
+    public static void receive(ServerPlayer player, dev.minedraft.lib.net.Channel.Frame frame) {
         BlueprintManager manager = BlueprintManager.get();
         if (manager == null) return;
         FriendlyByteBuf buf = frame.buf();

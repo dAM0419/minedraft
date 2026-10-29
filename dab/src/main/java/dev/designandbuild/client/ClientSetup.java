@@ -10,7 +10,7 @@ import dev.designandbuild.client.projection.ProjectionManager;
 import dev.designandbuild.client.projection.ProjectionRenderer;
 import dev.designandbuild.client.table.BlueprintMenuScreen;
 import dev.designandbuild.client.table.BlueprintTableScreen;
-import dev.designandbuild.compat.JeiState;
+import dev.minedraft.lib.compat.JeiState;
 import dev.designandbuild.item.BlueprintItem;
 import dev.designandbuild.net.Net;
 import net.minecraft.client.renderer.item.ItemProperties;
@@ -34,7 +34,7 @@ public final class ClientSetup {
 
     public static void init(IEventBus modBus) {
         ClientConfig.load();
-        Net.clientReceiver = ClientNet::receive;
+        Net.setClientReceiver(ClientNet::receive);
         BlueprintItem.clientMenuOpener = BlueprintMenuScreen::open;
 
         modBus.addListener(ClientSetup::clientSetup);

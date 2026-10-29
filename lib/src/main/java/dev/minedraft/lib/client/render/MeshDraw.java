@@ -1,4 +1,4 @@
-package dev.designandbuild.client.render;
+package dev.minedraft.lib.client.render;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.shaders.FogShape;

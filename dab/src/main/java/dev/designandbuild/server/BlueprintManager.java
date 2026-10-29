@@ -1,12 +1,13 @@
 package dev.designandbuild.server;
 
+import dev.minedraft.lib.server.SnapshotWriter;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import dev.designandbuild.DesignAndBuild;
 import dev.designandbuild.core.BlueprintModel;
-import dev.designandbuild.core.Box;
+import dev.minedraft.lib.util.Box;
 import dev.designandbuild.core.DesignTag;
 import dev.designandbuild.core.ModelCodec;
 import dev.designandbuild.core.ModelOps;

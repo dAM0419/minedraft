@@ -1,9 +1,12 @@
 package dev.designandbuild.client.editor;
 
+import dev.minedraft.lib.client.editor.Snapshot;
+import dev.minedraft.lib.client.editor.EditorColors;
+import dev.minedraft.lib.client.editor.EditorCamera;
 import dev.designandbuild.client.ClientStore;
 import dev.designandbuild.client.library.LibraryEntry;
 import dev.designandbuild.core.BlueprintModel;
-import dev.designandbuild.core.Box;
+import dev.minedraft.lib.util.Box;
 import dev.designandbuild.core.DesignTag;
 import dev.designandbuild.core.ModelOps;
 import dev.designandbuild.core.Requests;

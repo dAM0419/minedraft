@@ -1,7 +1,7 @@
 package dev.designandbuild.client.editor;
 
 import dev.designandbuild.client.ClientConfig;
-import dev.designandbuild.core.Box;
+import dev.minedraft.lib.util.Box;
 import dev.designandbuild.core.DesignTag;
 import dev.designandbuild.core.Requests;
 import dev.designandbuild.core.Resolved;

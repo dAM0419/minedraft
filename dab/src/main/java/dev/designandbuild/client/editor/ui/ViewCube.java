@@ -1,10 +1,10 @@
 package dev.designandbuild.client.editor.ui;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import dev.designandbuild.client.editor.EditorCamera;
+import dev.minedraft.lib.client.editor.EditorCamera;
 import dev.designandbuild.client.editor.EditorScreen;
-import dev.designandbuild.client.ui.Icons;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Icons;
+import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;

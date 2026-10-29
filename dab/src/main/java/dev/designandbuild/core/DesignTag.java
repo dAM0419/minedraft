@@ -13,6 +13,16 @@ public enum DesignTag {
         return id >= 0 && id < VALUES.length ? VALUES[id] : NONE;
     }
 
+    public static void writeAll(net.minecraft.network.FriendlyByteBuf buf, DesignTag[] tags) {
+        for (DesignTag t : tags) buf.writeByte(t.ordinal());
+    }
+
+    public static DesignTag[] readAll(net.minecraft.network.FriendlyByteBuf buf, int n) {
+        DesignTag[] tags = new DesignTag[n];
+        for (int i = 0; i < n; i++) tags[i] = byId(buf.readByte());
+        return tags;
+    }
+
     public String key() {
         return name().toLowerCase(java.util.Locale.ROOT);
     }

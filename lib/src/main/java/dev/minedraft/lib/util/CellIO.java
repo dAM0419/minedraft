@@ -1,4 +1,4 @@
-package dev.designandbuild.core;
+package dev.minedraft.lib.util;
 
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
@@ -44,16 +44,6 @@ public final class CellIO {
         BlockState[] states = new BlockState[n];
         for (int i = 0; i < n; i++) states[i] = readState(buf);
         return states;
-    }
-
-    public static void writeTags(FriendlyByteBuf buf, DesignTag[] tags) {
-        for (DesignTag t : tags) buf.writeByte(t.ordinal());
-    }
-
-    public static DesignTag[] readTags(FriendlyByteBuf buf, int n) {
-        DesignTag[] tags = new DesignTag[n];
-        for (int i = 0; i < n; i++) tags[i] = DesignTag.byId(buf.readByte());
-        return tags;
     }
 
     public static void writeDirection(FriendlyByteBuf buf, Direction d) {

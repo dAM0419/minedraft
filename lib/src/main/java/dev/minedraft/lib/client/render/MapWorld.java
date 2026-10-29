@@ -1,4 +1,4 @@
-package dev.designandbuild.client.library;
+package dev.minedraft.lib.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.client.Minecraft;

@@ -1,4 +1,4 @@
-package dev.designandbuild.client.render;
+package dev.minedraft.lib.client.render;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
@@ -49,7 +49,7 @@ public final class BlockMesher {
             case SOLID -> RenderType.solid();
             case CUTOUT_MIPPED -> RenderType.cutoutMipped();
             case CUTOUT -> RenderType.cutout();
-            default -> DabRenderTypes.TRANSLUCENT;
+            default -> LibRenderTypes.TRANSLUCENT;
         };
     }
 

@@ -6,7 +6,7 @@ import dev.designandbuild.client.editor.EditorSession;
 import dev.designandbuild.client.library.ClientLibrary;
 import dev.designandbuild.client.projection.ProjectionManager;
 import dev.designandbuild.client.table.BlueprintTableScreen;
-import dev.designandbuild.core.Box;
+import dev.minedraft.lib.util.Box;
 import dev.designandbuild.core.BlueprintModel;
 import dev.designandbuild.core.ModelCodec;
 import dev.designandbuild.core.ModelOps;
@@ -36,7 +36,7 @@ public final class ClientNet {
     @Nullable
     public static TableInfo tableInfo;
 
-    public static void receive(Net.Frame frame) {
+    public static void receive(dev.minedraft.lib.net.Channel.Frame frame) {
         try {
             dispatch(frame.kind(), frame.buf());
         } catch (Exception e) {

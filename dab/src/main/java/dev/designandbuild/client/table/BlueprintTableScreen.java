@@ -2,8 +2,8 @@ package dev.designandbuild.client.table;
 
 import dev.designandbuild.Registration;
 import dev.designandbuild.client.ClientNet;
-import dev.designandbuild.client.ui.Icons;
-import dev.designandbuild.client.ui.Ui;
+import dev.minedraft.lib.client.ui.Icons;
+import dev.minedraft.lib.client.ui.Ui;
 import dev.designandbuild.item.BlueprintRef;
 import dev.designandbuild.menu.BlueprintTableMenu;
 import dev.designandbuild.net.Msg;

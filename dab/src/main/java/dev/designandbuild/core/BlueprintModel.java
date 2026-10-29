@@ -1,5 +1,6 @@
 package dev.designandbuild.core;
 
+import dev.minedraft.lib.util.Box;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;

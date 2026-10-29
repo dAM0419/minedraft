@@ -1,5 +1,9 @@
 package dev.designandbuild.client.editor;
 
+import dev.minedraft.lib.client.editor.EditorColors;
+import dev.minedraft.lib.client.editor.EditorCamera;
+import dev.designandbuild.client.ui.TagColors;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
@@ -12,11 +16,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import dev.designandbuild.client.ClientConfig;
-import dev.designandbuild.client.render.DabRenderTypes;
-import dev.designandbuild.client.render.BlockMesher;
-import dev.designandbuild.client.render.MeshDraw;
-import dev.designandbuild.client.ui.Ui;
-import dev.designandbuild.core.Box;
+import dev.minedraft.lib.client.render.LibRenderTypes;
+import dev.minedraft.lib.client.render.BlockMesher;
+import dev.minedraft.lib.client.render.MeshDraw;
+import dev.minedraft.lib.client.ui.Ui;
+import dev.minedraft.lib.util.Box;
 import dev.designandbuild.core.DesignTag;
 import dev.designandbuild.core.Resolved;
 import dev.designandbuild.core.StructureInstance;
@@ -151,7 +155,7 @@ public final class ViewportRenderer {
             drawGhost(pv.placementGhost, rot, proj, pl.ox() - tx, pl.oy() - ty, pl.oz() - tz);
         }
 
-        VertexConsumer quads = BUFFERS.getBuffer(DabRenderTypes.QUADS_SEE_THROUGH);
+        VertexConsumer quads = BUFFERS.getBuffer(LibRenderTypes.QUADS_SEE_THROUGH);
         Matrix4f m = ps.last().pose();
         // 지우기 대상
         if (s.tool == EditorSession.Tool.DIRECT && s.op == EditorSession.Op.ERASE && pv.targets.length <= ToolLogic.GHOST_LIMIT) {
@@ -194,14 +198,14 @@ public final class ViewportRenderer {
             fillBox(quads, m, BlockPos.getX(c.pos()) - tx + 0.3, BlockPos.getY(c.pos()) - ty + 1.05, BlockPos.getZ(c.pos()) - tz + 0.3,
                     0.4, Ui.withAlpha(color, 230));
         }
-        BUFFERS.endBatch(DabRenderTypes.QUADS_SEE_THROUGH);
+        BUFFERS.endBatch(LibRenderTypes.QUADS_SEE_THROUGH);
 
         // 선은 선 셰이더의 축소 보정을 되돌리고 화면 쪽으로 살짝 당겨 그린다 (멀리 있는 상자가 어긋나지 않게)
         Matrix4fStack mvs = RenderSystem.getModelViewStack();
         mvs.pushMatrix();
         mvs.set(EditorRenderer.lineView(rot, s.camera.realScale()));
         RenderSystem.applyModelViewMatrix();
-        VertexConsumer lines = BUFFERS.getBuffer(DabRenderTypes.LINES_SEE_THROUGH);
+        VertexConsumer lines = BUFFERS.getBuffer(LibRenderTypes.LINES_SEE_THROUGH);
         // 선택한 구조물·커서 아래 구조물
         if (s.tool == EditorSession.Tool.SELECT && screen.hover != null) {
             for (int id : s.structuresAround(screen.hover.pos())) {
@@ -232,9 +236,9 @@ public final class ViewportRenderer {
             if (!c.has()) continue;
             dashedBox(lines, ps, c.region(), tx, ty, tz, Ui.withAlpha(EditorColors.editorColor(c.player()), 200));
         }
-        BUFFERS.endBatch(DabRenderTypes.LINES_SEE_THROUGH);
+        BUFFERS.endBatch(LibRenderTypes.LINES_SEE_THROUGH);
 
-        VertexConsumer solidLines = BUFFERS.getBuffer(DabRenderTypes.LINES);
+        VertexConsumer solidLines = BUFFERS.getBuffer(LibRenderTypes.LINES);
         if (s.selected != 0) {
             StructureInstance st = s.model.structure(s.selected);
             if (st != null && st.bounds() != null) box(solidLines, ps, st.bounds(), tx, ty, tz, 0xFFFFFFFF);
@@ -259,7 +263,7 @@ public final class ViewportRenderer {
             BlockPos p = screen.hover.pos();
             box(solidLines, ps, new Box(p.getX(), p.getY(), p.getZ(), p.getX(), p.getY(), p.getZ()), tx, ty, tz, Ui.ACCENT);
         }
-        BUFFERS.endBatch(DabRenderTypes.LINES);
+        BUFFERS.endBatch(LibRenderTypes.LINES);
         mvs.popMatrix();
         RenderSystem.applyModelViewMatrix();
     }
@@ -267,9 +271,9 @@ public final class ViewportRenderer {
     private static void drawGhost(BlockMesher.Mesh mesh, Matrix4f rot, Matrix4f proj, double ox, double oy, double oz) {
         if (!mesh.hasLayer(BlockMesher.TRANSLUCENT)) return;
         Matrix4f mv = new Matrix4f(rot).translate((float) ox, (float) oy, (float) oz);
-        MeshDraw.beginLayer(DabRenderTypes.GHOST, true);
+        MeshDraw.beginLayer(LibRenderTypes.GHOST, true);
         MeshDraw.draw(mesh.buffers[BlockMesher.TRANSLUCENT], mv, proj);
-        MeshDraw.endLayer(DabRenderTypes.GHOST);
+        MeshDraw.endLayer(LibRenderTypes.GHOST);
     }
 
     /** 태그 보기: 설계 칸 윗면을 태그 색으로 덮는다 (도면 판이 바뀔 때만 다시 굽는다). */
@@ -300,7 +304,7 @@ public final class ViewportRenderer {
                 } else {
                     Resolved above = s.model.resolved(x, y + 1, z);
                     if (above != null && !above.isAir() && !(s.cutActive && s.isCut(x, y + 1, z))) continue;
-                    color = Ui.withAlpha(Ui.tagColor(r.tag()), r.tag() == DesignTag.STRUCTURE ? 80 : 110);
+                    color = Ui.withAlpha(TagColors.tagColor(r.tag()), r.tag() == DesignTag.STRUCTURE ? 80 : 110);
                     top = y + 1.01F;
                 }
                 float fx = x - tagOx, fy = top - tagOy, fz = z - tagOz;
@@ -322,14 +326,14 @@ public final class ViewportRenderer {
         if (tagBuffer == null) return;
         Matrix4f mv = new Matrix4f(rot).translate((float) (tagOx - s.camera.tx), (float) (tagOy - s.camera.ty),
                 (float) (tagOz - s.camera.tz));
-        DabRenderTypes.QUADS.setupRenderState();
+        LibRenderTypes.QUADS.setupRenderState();
         ShaderInstance shader = RenderSystem.getShader();
         if (shader != null) {
             tagBuffer.bind();
             tagBuffer.drawWithShader(mv, proj, shader);
             VertexBuffer.unbind();
         }
-        DabRenderTypes.QUADS.clearRenderState();
+        LibRenderTypes.QUADS.clearRenderState();
     }
 
     // ------------------------------------------------------------------

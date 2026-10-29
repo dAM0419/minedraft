@@ -1,5 +1,6 @@
 package dev.designandbuild.core;
 
+import dev.minedraft.lib.util.CellIO;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.core.Direction;
@@ -57,7 +58,7 @@ public final class ModelCodec {
         }
         CellIO.writePositions(buf, pos);
         CellIO.writeStates(buf, states);
-        CellIO.writeTags(buf, tags);
+        DesignTag.writeAll(buf, tags);
 
         List<StructureInstance> list = m.orderedStructures();
         buf.writeVarInt(list.size());
@@ -97,7 +98,7 @@ public final class ModelCodec {
 
         long[] pos = CellIO.readPositions(buf, ModelOps.MAX_CELLS);
         BlockState[] states = CellIO.readStates(buf, pos.length);
-        DesignTag[] tags = CellIO.readTags(buf, pos.length);
+        DesignTag[] tags = DesignTag.readAll(buf, pos.length);
         for (int i = 0; i < pos.length; i++) {
             if (states[i] != null) m.loadTerrain(pos[i], new TerrainCell(states[i], tags[i]));
         }

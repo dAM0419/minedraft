@@ -2,7 +2,7 @@ package dev.designandbuild.compat.jei;
 
 import dev.designandbuild.DesignAndBuild;
 import dev.designandbuild.client.editor.EditorScreen;
-import dev.designandbuild.compat.JeiState;
+import dev.minedraft.lib.compat.JeiState;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.constants.VanillaTypes;

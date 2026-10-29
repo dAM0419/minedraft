@@ -1,4 +1,4 @@
-package dev.designandbuild.client.editor;
+package dev.minedraft.lib.client.editor;
 
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
