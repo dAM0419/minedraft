@@ -64,8 +64,8 @@ public class BlueprintTableBlockEntity extends BlockEntity implements MenuProvid
 
     public void syncBlueprintName(BlueprintModel m) {
         BlueprintRef ref = blueprint.get(Registration.BLUEPRINT_REF.get());
-        if (ref != null && !ref.name().equals(m.name)) {
-            blueprint.set(Registration.BLUEPRINT_REF.get(), ref.withName(m.name));
+        if (ref != null && !ref.name().equals(m.name())) {
+            blueprint.set(Registration.BLUEPRINT_REF.get(), ref.withName(m.name()));
             setChanged();
         }
     }

@@ -30,20 +30,6 @@ public final class ServerNet {
         switch (frame.kind()) {
             case Msg.C_OPEN_EDITOR -> openEditor(manager, player, buf.readBlockPos());
             case Msg.C_START_DESIGN -> startDesign(manager, player, buf.readBlockPos(), buf.readUtf(64));
-            case Msg.C_CLOSE_EDITOR -> manager.closeEditor(player, null);
-            case Msg.C_EDIT -> {
-                UUID bp = buf.readUUID();
-                int seq = buf.readVarInt();
-                Requests.Req req = Requests.read(buf);
-                manager.handleEdit(player, bp, seq, req);
-            }
-            case Msg.C_CURSOR -> {
-                UUID bp = buf.readUUID();
-                byte[] data = buf.readByteArray(512);
-                manager.relayCursor(player, bp, data);
-            }
-            case Msg.C_SUBSCRIBE -> manager.subscribe(player, buf.readUUID(), buf.readVarLong());
-            case Msg.C_UNSUBSCRIBE -> manager.unsubscribe(player, buf.readUUID());
             case Msg.C_LIBRARY_REQ -> {
                 var list = StructureLibrary.entries(manager.server());
                 Net.toPlayer(player, Msg.S_LIBRARY, b -> StructureLibrary.writeList(b, list));
@@ -153,7 +139,7 @@ public final class ServerNet {
         }
         BlueprintModel m = manager.create(player.serverLevel(), table.getBlockPos(), name.isBlank() ? "Blueprint" : name);
         ItemStack bound = stack.copyWithCount(1);
-        bound.set(Registration.BLUEPRINT_REF.get(), new BlueprintRef(m.id, m.name, m.baseX, m.baseZ,
+        bound.set(Registration.BLUEPRINT_REF.get(), new BlueprintRef(m.id, m.name(), m.baseX, m.baseZ,
                 m.dimension.location().toString()));
         table.setBlueprint(bound);
         player.closeContainer();
@@ -171,7 +157,7 @@ public final class ServerNet {
             int state = stack.isEmpty() ? 0 : ref == null ? 1 : m == null ? 3 : 2;
             buf.writeByte(state);
             if (m != null) {
-                buf.writeUtf(m.name);
+                buf.writeUtf(m.name());
                 buf.writeVarInt(m.baseX);
                 buf.writeVarInt(m.baseZ);
                 buf.writeVarInt(m.chunks().size());

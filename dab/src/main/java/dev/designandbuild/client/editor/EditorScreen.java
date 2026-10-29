@@ -1,7 +1,12 @@
 package dev.designandbuild.client.editor;
 
+import dev.minedraft.lib.edit.EditRequests;
+
+import dev.minedraft.lib.net.LibNet;
+
+import dev.minedraft.lib.client.ClientAreas;
+
 import dev.designandbuild.client.ClientConfig;
-import dev.designandbuild.client.ClientStore;
 import dev.designandbuild.client.editor.ui.BlockPicker;
 import dev.designandbuild.client.editor.ui.HelpOverlay;
 import dev.designandbuild.client.editor.ui.LayerSlider;
@@ -174,13 +179,9 @@ public final class EditorScreen extends Screen {
     @Override
     public void removed() {
         super.removed();
-        Net.toServer(Msg.C_CLOSE_EDITOR, buf -> {});
         preview.close();
         ViewportRenderer.release();
-        if (ClientStore.editor == s) {
-            s.dispose();
-            ClientStore.editor = null;
-        }
+        ClientAreas.editorClosed(s);
         ClientConfig.save();
     }
 
@@ -370,7 +371,7 @@ public final class EditorScreen extends Screen {
         Box r = region;
         java.util.UUID id = s.model.id;
         int sel = s.selected;
-        Net.toServer(Msg.C_CURSOR, buf -> {
+        LibNet.CHANNEL.toServer(LibNet.C_CURSOR, buf -> {
             buf.writeUUID(id);
             buf.writeByteArray(Net.encode(b -> {
                 b.writeBoolean(h != null);
@@ -594,7 +595,7 @@ public final class EditorScreen extends Screen {
                 }
                 armedKey = Long.MIN_VALUE;
                 stroking = true;
-                strokeGroup = dev.designandbuild.client.ClientStore.nextGroup();
+                strokeGroup = ClientAreas.nextGroup();
                 strokeDone.clear();
                 strokePos = h.pos();
                 strokeFace = h.face();
@@ -909,11 +910,11 @@ public final class EditorScreen extends Screen {
         }
         boolean ctrl = hasControlDown();
         if (ctrl && key == GLFW.GLFW_KEY_Z) {
-            s.send(hasShiftDown() ? new Requests.Redo() : new Requests.Undo());
+            s.send(hasShiftDown() ? new EditRequests.Redo() : new EditRequests.Undo());
             return true;
         }
         if (ctrl && key == GLFW.GLFW_KEY_Y) {
-            s.send(new Requests.Redo());
+            s.send(new EditRequests.Redo());
             return true;
         }
         switch (key) {

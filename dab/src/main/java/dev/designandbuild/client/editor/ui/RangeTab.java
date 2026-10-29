@@ -1,5 +1,7 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.edit.EditRequests;
+
 import com.mojang.math.Axis;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
@@ -393,7 +395,7 @@ final class RangeTab {
             s().toast(Component.translatable(error));
             return;
         }
-        s().send(new Requests.ChunkChange(add.toLongArray(), new long[0]));
+        s().send(new EditRequests.ChunkChange(add.toLongArray(), new long[0]));
         selected.removeAll(add);
     }
 
@@ -407,7 +409,7 @@ final class RangeTab {
             return;
         }
         Runnable send = () -> {
-            s().send(new Requests.ChunkChange(new long[0], remove.toLongArray()));
+            s().send(new EditRequests.ChunkChange(new long[0], remove.toLongArray()));
             selected.removeAll(remove);
         };
         Dialogs.ChunkImpact impact = Dialogs.impactOf(s(), remove);

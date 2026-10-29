@@ -36,6 +36,18 @@ public final class ClientSetup {
         ClientConfig.load();
         Net.setClientReceiver(ClientNet::receive);
         BlueprintItem.clientMenuOpener = BlueprintMenuScreen::open;
+        // Lib 이 DaB 도면 영역의 편집창을 열 때: 편집 상태를 만들고 화면을 띄운다
+        dev.minedraft.lib.client.ClientAreas.registerEditor(dev.designandbuild.core.BlueprintModel.AREA_TYPE, (area, anchor) -> {
+            dev.designandbuild.client.editor.EditorSession session =
+                    new dev.designandbuild.client.editor.EditorSession(dev.designandbuild.core.BlueprintModel.of(area), anchor);
+            net.minecraft.client.Minecraft.getInstance().setScreen(new EditorScreen(session));
+            return session;
+        });
+        // 사본이 통째로 바뀌면 투영도 새 사본으로
+        dev.minedraft.lib.client.ClientAreas.onReplaced(area -> {
+            dev.designandbuild.core.BlueprintModel m = dev.designandbuild.core.BlueprintModel.ofNullable(area);
+            if (m != null) ProjectionManager.onModelReplaced(m);
+        });
 
         modBus.addListener(ClientSetup::clientSetup);
         modBus.addListener(ClientSetup::registerScreens);
@@ -89,7 +101,6 @@ public final class ClientSetup {
     }
 
     private static void loggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
-        ClientStore.reset();
         ClientLibrary.reset();
         ProjectionManager.reset();
         Net.resetClient();

@@ -1,8 +1,9 @@
 package dev.designandbuild.client.projection;
 
+import dev.minedraft.lib.client.ClientAreas;
+
 import dev.designandbuild.Registration;
 import dev.designandbuild.client.ClientConfig;
-import dev.designandbuild.client.ClientStore;
 import dev.designandbuild.client.Keys;
 import dev.designandbuild.core.BlueprintModel;
 import dev.designandbuild.item.BlueprintRef;
@@ -145,18 +146,13 @@ public final class ProjectionManager {
         if (!Objects.equals(held, subscribed)) {
             if (subscribed != null) {
                 UUID old = subscribed;
-                Net.toServer(Msg.C_UNSUBSCRIBE, b -> b.writeUUID(old));
+                ClientAreas.unsubscribe(old);
             }
             subscribed = held;
             active = null;
             ProjectionRenderer.clear();
             if (held != null) {
-                BlueprintModel m = ClientStore.MODELS.get(held);
-                long known = m == null ? -1 : m.version;
-                Net.toServer(Msg.C_SUBSCRIBE, b -> {
-                    b.writeUUID(held);
-                    b.writeVarLong(known);
-                });
+                ClientAreas.subscribe(held);
             }
         }
         if (subscribed == null) {
@@ -167,7 +163,7 @@ public final class ProjectionManager {
             return;
         }
         if (active == null) {
-            BlueprintModel m = ClientStore.MODELS.get(subscribed);
+            BlueprintModel m = BlueprintModel.ofNullable(ClientAreas.get(subscribed));
             if (m == null) {
                 drainKeys();
                 return;
@@ -290,7 +286,7 @@ public final class ProjectionManager {
         if (ev == 0 || mc.player == null) return;
         if ((ev & Projection.EVENT_ALL) != 0) {
             mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.0F, 0.6F));
-            mc.player.displayClientMessage(Component.translatable("designandbuild.projection.all_done", p.model.name), true);
+            mc.player.displayClientMessage(Component.translatable("designandbuild.projection.all_done", p.model.name()), true);
         } else if ((ev & Projection.EVENT_STAGE) != 0) {
             mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.6F, 0.4F));
             mc.player.displayClientMessage(Component.translatable("designandbuild.projection.stage_done", stageName(p, p.currentStage())), true);

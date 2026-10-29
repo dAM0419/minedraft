@@ -1,5 +1,20 @@
 package dev.designandbuild.core;
 
+import dev.designandbuild.DesignAndBuild;
+import dev.minedraft.lib.area.Area;
+import dev.minedraft.lib.area.AreaLayer;
+import dev.minedraft.lib.area.AreaType;
+import dev.minedraft.lib.area.LayerKey;
+import dev.minedraft.lib.util.Box;
+import dev.minedraft.lib.util.CellIO;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+
 import dev.minedraft.lib.util.Box;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -30,7 +45,8 @@ import java.util.UUID;
 import java.util.function.LongConsumer;
 
 /**
- * 도면 하나의 설계 데이터. 서버(원본)와 클라이언트(사본) 양쪽에서 같은 코드로 쓴다.
+ * 도면 하나의 설계 데이터 = Minedraft Lib 영역의 DaB 설계층. 서버(원본)와 클라이언트(사본) 양쪽에서 같은 코드로 쓴다.
+ * 영역 정보(청크, 이름, 버전, 변경 알림)는 Lib 의 {@link Area} 가 갖고, 여기서는 그대로 넘겨 준다.
  *
  * <pre>
  * 지형 층   : 칸마다 (블록, 바닥/길/철거 태그)
@@ -42,20 +58,31 @@ import java.util.function.LongConsumer;
  *
  * 모든 변경은 ModelOps 를 거치고, 끝나면 {@link #flush()} 로 최종 목표를 다시 계산한다.
  */
-public final class BlueprintModel {
+public final class BlueprintModel implements AreaLayer {
+    public static final ResourceLocation ID = DesignAndBuild.rl("design");
+    public static final LayerKey<BlueprintModel> KEY = new LayerKey<>(ID, BlueprintModel.class);
     public static final int MAX_CHUNKS = 100;
+    /** DaB 도면 영역: 처음 3×3 청크, 최대 100 청크, 설계층 하나. */
+    public static final AreaType AREA_TYPE = new AreaType(DesignAndBuild.rl("blueprint"), MAX_CHUNKS, 1,
+            List.of(BlueprintModel::new));
 
+    public static BlueprintModel of(Area area) {
+        return area.layer(KEY);
+    }
+
+    @Nullable
+    public static BlueprintModel ofNullable(@Nullable Area area) {
+        return area == null ? null : area.layerOrNull(KEY);
+    }
+
+    public final Area area;
     public final UUID id;
-    public String name;
     public final ResourceKey<Level> dimension;
     public final int baseX, baseZ;
     /** 건축 가능 높이 [minY, maxY) */
     public final int minY, maxY;
     public int nextStructureId = 1;
-    /** 서버가 변경을 적용할 때마다 1씩 오른다. */
-    public long version;
 
-    private final LongOpenHashSet chunks = new LongOpenHashSet();
     private final Long2ObjectOpenHashMap<TerrainCell> terrain = new Long2ObjectOpenHashMap<>();
     private final Int2ObjectOpenHashMap<StructureInstance> structures = new Int2ObjectOpenHashMap<>();
     private final IntArrayList order = new IntArrayList();
@@ -65,75 +92,84 @@ public final class BlueprintModel {
     private final Long2ObjectOpenHashMap<Resolved> resolved = new Long2ObjectOpenHashMap<>();
     private final Int2IntOpenHashMap orderIndex = new Int2IntOpenHashMap();
     private final LongOpenHashSet pending = new LongOpenHashSet();
-    private long revision;
-    @Nullable
-    /** 칸 변경 알림 (편집창 그림, 투영). 보통 0~2개. */
-    private final java.util.List<LongConsumer> listeners = new java.util.ArrayList<>(2);
 
     private long conflictCacheRevision = -1;
     private final Int2IntOpenHashMap conflictCache = new Int2IntOpenHashMap();
 
-    public BlueprintModel(UUID id, String name, ResourceKey<Level> dimension, int baseX, int baseZ, int minY, int maxY) {
-        this.id = id;
-        this.name = name;
-        this.dimension = dimension;
-        this.baseX = baseX;
-        this.baseZ = baseZ;
-        this.minY = minY;
-        this.maxY = maxY;
+    private BlueprintModel(Area area) {
+        this.area = area;
+        this.id = area.id;
+        this.dimension = area.dimension;
+        this.baseX = area.baseX;
+        this.baseZ = area.baseZ;
+        this.minY = area.minY;
+        this.maxY = area.maxY;
         this.orderIndex.defaultReturnValue(Integer.MAX_VALUE);
     }
 
-    /** 기준 청크를 가운데로 3×3 청크를 가진 새 도면. */
-    public static BlueprintModel createNew(UUID id, String name, ResourceKey<Level> dimension, int baseX, int baseZ, int minY, int maxY) {
-        BlueprintModel m = new BlueprintModel(id, name, dimension, baseX, baseZ, minY, maxY);
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                m.chunks.add(ChunkPos.asLong(baseX + dx, baseZ + dz));
-            }
-        }
-        return m;
+    @Override
+    public ResourceLocation id() {
+        return ID;
+    }
+
+    // ---- 영역 정보 (Lib) ----
+
+    public String name() {
+        return area.name();
+    }
+
+    public long version() {
+        return area.version;
+    }
+
+    public long revision() {
+        return area.revision();
+    }
+
+    public void addListener(LongConsumer listener) {
+        area.addListener(listener);
+    }
+
+    public void removeListener(LongConsumer listener) {
+        area.removeListener(listener);
+    }
+
+    public long baseChunk() {
+        return area.baseChunk();
+    }
+
+    public LongSet chunks() {
+        return area.chunks();
+    }
+
+    public boolean hasChunk(int chunkX, int chunkZ) {
+        return area.hasChunk(chunkX, chunkZ);
+    }
+
+    public boolean isInside(int x, int y, int z) {
+        return area.isInside(x, y, z);
+    }
+
+    public boolean isInside(long pos) {
+        return area.isInside(pos);
+    }
+
+    public boolean isInsideColumn(int x, int z) {
+        return area.isInsideColumn(x, z);
+    }
+
+    public Box areaBounds() {
+        return area.areaBounds();
+    }
+
+    @Nullable
+    public String checkChunkChange(LongSet add, LongSet remove) {
+        return area.checkChunkChange(add, remove);
     }
 
     // ------------------------------------------------------------------
     // 읽기
     // ------------------------------------------------------------------
-
-    public long revision() {
-        return revision;
-    }
-
-    public void addListener(LongConsumer listener) {
-        if (!listeners.contains(listener)) listeners.add(listener);
-    }
-
-    public void removeListener(LongConsumer listener) {
-        listeners.remove(listener);
-    }
-
-    public long baseChunk() {
-        return ChunkPos.asLong(baseX, baseZ);
-    }
-
-    public LongSet chunks() {
-        return LongSets.unmodifiable(chunks);
-    }
-
-    public boolean hasChunk(int chunkX, int chunkZ) {
-        return chunks.contains(ChunkPos.asLong(chunkX, chunkZ));
-    }
-
-    public boolean isInside(int x, int y, int z) {
-        return y >= minY && y < maxY && chunks.contains(ChunkPos.asLong(x >> 4, z >> 4));
-    }
-
-    public boolean isInside(long pos) {
-        return isInside(BlockPos.getX(pos), BlockPos.getY(pos), BlockPos.getZ(pos));
-    }
-
-    public boolean isInsideColumn(int x, int z) {
-        return chunks.contains(ChunkPos.asLong(x >> 4, z >> 4));
-    }
 
     public Long2ObjectMap<TerrainCell> terrain() {
         return Long2ObjectMaps.unmodifiable(terrain);
@@ -186,12 +222,12 @@ public final class BlueprintModel {
 
     /** 구조물별 덮어쓰기 충돌 칸 수 (덮어쓴 쪽 기준). */
     public int conflictsOf(int structureId) {
-        if (conflictCacheRevision != revision) {
+        if (conflictCacheRevision != area.revision()) {
             conflictCache.clear();
             for (Resolved r : resolved.values()) {
                 if (r.conflict()) conflictCache.addTo(r.owner(), 1);
             }
-            conflictCacheRevision = revision;
+            conflictCacheRevision = area.revision();
         }
         return conflictCache.get(structureId);
     }
@@ -202,55 +238,6 @@ public final class BlueprintModel {
             if (e.getValue().conflict() && e.getValue().owner() == structureId) return e.getLongKey();
         }
         return Long.MIN_VALUE;
-    }
-
-    /** 청크 영역의 블록 좌표 범위 (높이는 건축 가능 높이). */
-    public Box areaBounds() {
-        int minCX = Integer.MAX_VALUE, minCZ = Integer.MAX_VALUE, maxCX = Integer.MIN_VALUE, maxCZ = Integer.MIN_VALUE;
-        for (long c : chunks) {
-            int cx = ChunkPos.getX(c), cz = ChunkPos.getZ(c);
-            minCX = Math.min(minCX, cx);
-            minCZ = Math.min(minCZ, cz);
-            maxCX = Math.max(maxCX, cx);
-            maxCZ = Math.max(maxCZ, cz);
-        }
-        if (minCX == Integer.MAX_VALUE) {
-            minCX = maxCX = baseX;
-            minCZ = maxCZ = baseZ;
-        }
-        return new Box(minCX << 4, minY, minCZ << 4, (maxCX << 4) + 15, maxY - 1, (maxCZ << 4) + 15);
-    }
-
-    /**
-     * 청크 여러 개를 한꺼번에 넣고 뺄 때의 검사. 결과 영역 기준으로: 기준 청크는 남아야 하고,
-     * 최대 청크 수 이하이며, 기준 청크에서 이어진 한 덩어리여야 한다.
-     * @return 문제가 없으면 null, 있으면 번역 키
-     */
-    @Nullable
-    public String checkChunkChange(LongSet add, LongSet remove) {
-        LongOpenHashSet next = new LongOpenHashSet(chunks);
-        LongIterator it = remove.iterator();
-        while (it.hasNext()) {
-            long c = it.nextLong();
-            if (c == baseChunk() || !next.remove(c)) return "designandbuild.msg.chunk_cannot_remove";
-        }
-        it = add.iterator();
-        while (it.hasNext()) next.add(it.nextLong());
-        if (next.size() > MAX_CHUNKS) return "designandbuild.msg.chunk_limit";
-        LongOpenHashSet seen = new LongOpenHashSet();
-        LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
-        queue.enqueue(baseChunk());
-        seen.add(baseChunk());
-        while (!queue.isEmpty()) {
-            long c = queue.dequeueLong();
-            int cx = ChunkPos.getX(c), cz = ChunkPos.getZ(c);
-            long[] around = {ChunkPos.asLong(cx + 1, cz), ChunkPos.asLong(cx - 1, cz), ChunkPos.asLong(cx, cz + 1), ChunkPos.asLong(cx, cz - 1)};
-            for (long n : around) {
-                if (next.contains(n) && seen.add(n)) queue.enqueue(n);
-            }
-        }
-        if (seen.size() != next.size()) return add.isEmpty() ? "designandbuild.msg.chunk_split" : "designandbuild.msg.chunk_not_adjacent";
-        return null;
     }
 
     /** 청크 안에 기록된 설계 칸 수와 걸쳐 있는 구조물 (제거 경고용). */
@@ -322,7 +309,7 @@ public final class BlueprintModel {
         order.add(idx, id);
         rebuildOrderIndex();
         if (id >= nextStructureId) nextStructureId = id + 1;
-        revision++;
+        area.bump();
         return s;
     }
 
@@ -335,7 +322,7 @@ public final class BlueprintModel {
         }
         order.rem(id);
         rebuildOrderIndex();
-        revision++;
+        area.bump();
     }
 
     public void moveInOrder(int id, int index) {
@@ -346,29 +333,20 @@ public final class BlueprintModel {
         order.add(idx, id);
         rebuildOrderIndex();
         pending.addAll(s.blocks.keySet());
-        revision++;
+        area.bump();
     }
 
     public void renameStructure(int id, String newName) {
         StructureInstance s = structures.get(id);
         if (s != null) {
             s.name = newName;
-            revision++;
+            area.bump();
         }
     }
 
-    public void rename(String newName) {
-        this.name = newName;
-        revision++;
-    }
-
-    public void addChunk(long chunk) {
-        if (chunks.add(chunk)) revision++;
-    }
-
-    /** 청크를 빼고 그 안의 설계를 모두 지운다. 구조물은 남은 블록만 남는다. */
-    public void removeChunk(long chunk) {
-        if (!chunks.remove(chunk)) return;
+    /** 청크가 빠졌다: 그 안의 설계를 모두 지운다. 구조물은 남은 블록만 남는다. */
+    @Override
+    public void onChunkRemoved(long chunk) {
         int cx = ChunkPos.getX(chunk), cz = ChunkPos.getZ(chunk);
         LongIterator it = terrain.keySet().iterator();
         while (it.hasNext()) {
@@ -397,24 +375,25 @@ public final class BlueprintModel {
             }
         }
         for (int id : emptied) deleteStructure(id);
-        revision++;
+        flush();
     }
 
-    /** 대기 중인 칸들의 최종 목표를 다시 계산하고 변경을 알린다. */
+    /** 대기 중인 칸들의 최종 목표를 다시 계산하고 영역 구독자에게 변경을 알린다. */
     public void flush() {
         if (pending.isEmpty()) return;
         LongIterator it = pending.iterator();
-        while (it.hasNext()) resolveAt(it.nextLong());
-        for (LongConsumer listener : listeners) {
-            LongIterator it2 = pending.iterator();
-            while (it2.hasNext()) listener.accept(it2.nextLong());
+        while (it.hasNext()) {
+            long p = it.nextLong();
+            resolveAt(p);
+            area.markChanged(p);
         }
         pending.clear();
-        revision++;
+        area.flush();
     }
 
     /** 불러온 직후 파생 데이터를 처음부터 만든다. */
-    public void rebuildDerived() {
+    @Override
+    public void afterLoad() {
         posIndex.clear();
         resolved.clear();
         rebuildOrderIndex();
@@ -428,10 +407,6 @@ public final class BlueprintModel {
     }
 
     // ---- 불러오기 전용 (코덱) ----
-
-    void loadChunk(long chunk) {
-        chunks.add(chunk);
-    }
 
     void loadTerrain(long pos, TerrainCell cell) {
         terrain.put(pos, cell);
@@ -513,5 +488,177 @@ public final class BlueprintModel {
     private void rebuildOrderIndex() {
         orderIndex.clear();
         for (int i = 0; i < order.size(); i++) orderIndex.put(order.getInt(i), i);
+    }
+
+    // ------------------------------------------------------------------
+    // 통신·저장 (설계층 내용만, 영역 정보는 Lib)
+    // ------------------------------------------------------------------
+
+    @Override
+    public void writeNet(FriendlyByteBuf buf) {
+        buf.writeVarInt(nextStructureId);
+        long[] pos = new long[terrain.size()];
+        BlockState[] states = new BlockState[pos.length];
+        DesignTag[] tags = new DesignTag[pos.length];
+        int i = 0;
+        for (Long2ObjectMap.Entry<TerrainCell> e : terrain.long2ObjectEntrySet()) {
+            pos[i] = e.getLongKey();
+            states[i] = e.getValue().state();
+            tags[i] = e.getValue().tag();
+            i++;
+        }
+        CellIO.writePositions(buf, pos);
+        CellIO.writeStates(buf, states);
+        DesignTag.writeAll(buf, tags);
+        List<StructureInstance> list = orderedStructures();
+        buf.writeVarInt(list.size());
+        for (StructureInstance st : list) {
+            buf.writeVarInt(st.id);
+            buf.writeUtf(st.name);
+            buf.writeUtf(st.source);
+            CellIO.writeDirection(buf, st.mount);
+            CellIO.writeRotation(buf, st.rotation);
+            CellIO.writeMirror(buf, st.mirror);
+            long[] sp = new long[st.blocks.size()];
+            BlockState[] ss = new BlockState[sp.length];
+            int j = 0;
+            for (Long2ObjectMap.Entry<BlockState> e : st.blocks.long2ObjectEntrySet()) {
+                sp[j] = e.getLongKey();
+                ss[j] = e.getValue();
+                j++;
+            }
+            CellIO.writePositions(buf, sp);
+            CellIO.writeStates(buf, ss);
+        }
+    }
+
+    @Override
+    public void readNet(FriendlyByteBuf buf) {
+        nextStructureId = buf.readVarInt();
+        long[] pos = CellIO.readPositions(buf, ModelOps.MAX_CELLS);
+        BlockState[] states = CellIO.readStates(buf, pos.length);
+        DesignTag[] tags = DesignTag.readAll(buf, pos.length);
+        for (int i = 0; i < pos.length; i++) {
+            if (states[i] != null) loadTerrain(pos[i], new TerrainCell(states[i], tags[i]));
+        }
+        int count = buf.readVarInt();
+        for (int i = 0; i < count; i++) {
+            int sid = buf.readVarInt();
+            String sname = buf.readUtf();
+            String source = buf.readUtf();
+            Direction mount = CellIO.readDirection(buf);
+            Rotation rot = CellIO.readRotation(buf);
+            Mirror mirror = CellIO.readMirror(buf);
+            StructureInstance st = new StructureInstance(sid, sname, source, mount, rot, mirror);
+            long[] sp = CellIO.readPositions(buf, ModelOps.MAX_CELLS);
+            BlockState[] ss = CellIO.readStates(buf, sp.length);
+            for (int j = 0; j < sp.length; j++) {
+                if (ss[j] != null) st.blocks.put(sp[j], ss[j]);
+            }
+            loadStructure(st);
+        }
+    }
+
+    @Override
+    public CompoundTag save() {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("nextId", nextStructureId);
+        Palette palette = new Palette();
+        long[] pos = new long[terrain.size()];
+        int[] st = new int[pos.length];
+        byte[] tg = new byte[pos.length];
+        int i = 0;
+        for (Long2ObjectMap.Entry<TerrainCell> e : terrain.long2ObjectEntrySet()) {
+            pos[i] = e.getLongKey();
+            st[i] = palette.id(e.getValue().state());
+            tg[i] = (byte) e.getValue().tag().ordinal();
+            i++;
+        }
+        CompoundTag t = new CompoundTag();
+        t.putLongArray("pos", pos);
+        t.putIntArray("state", st);
+        t.putByteArray("tag", tg);
+        tag.put("terrain", t);
+        ListTag structs = new ListTag();
+        for (StructureInstance s : orderedStructures()) {
+            CompoundTag c = new CompoundTag();
+            c.putInt("id", s.id);
+            c.putString("name", s.name);
+            c.putString("source", s.source);
+            c.putInt("mount", s.mount.get3DDataValue());
+            c.putInt("rot", s.rotation.ordinal());
+            c.putInt("mirror", s.mirror.ordinal());
+            long[] sp = new long[s.blocks.size()];
+            int[] ss = new int[sp.length];
+            int j = 0;
+            for (Long2ObjectMap.Entry<BlockState> e : s.blocks.long2ObjectEntrySet()) {
+                sp[j] = e.getLongKey();
+                ss[j] = palette.id(e.getValue());
+                j++;
+            }
+            c.putLongArray("pos", sp);
+            c.putIntArray("state", ss);
+            structs.add(c);
+        }
+        tag.put("structures", structs);
+        ListTag pal = new ListTag();
+        for (BlockState s : palette.states) pal.add(NbtUtils.writeBlockState(s));
+        tag.put("palette", pal);
+        return tag;
+    }
+
+    @Override
+    public void load(CompoundTag tag) {
+        nextStructureId = Math.max(1, tag.getInt("nextId"));
+        ListTag pal = tag.getList("palette", Tag.TAG_COMPOUND);
+        BlockState[] palette = new BlockState[pal.size()];
+        for (int i = 0; i < pal.size(); i++) {
+            palette[i] = NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), pal.getCompound(i));
+        }
+        CompoundTag t = tag.getCompound("terrain");
+        long[] pos = t.getLongArray("pos");
+        int[] st = t.getIntArray("state");
+        byte[] tg = t.getByteArray("tag");
+        int n = Math.min(pos.length, Math.min(st.length, tg.length));
+        for (int i = 0; i < n; i++) loadTerrain(pos[i], new TerrainCell(stateAt(palette, st[i]), DesignTag.byId(tg[i])));
+        ListTag structs = tag.getList("structures", Tag.TAG_COMPOUND);
+        Rotation[] rots = Rotation.values();
+        Mirror[] mirrors = Mirror.values();
+        for (int i = 0; i < structs.size(); i++) {
+            CompoundTag c = structs.getCompound(i);
+            int r = c.getInt("rot"), mi = c.getInt("mirror");
+            StructureInstance s = new StructureInstance(c.getInt("id"), c.getString("name"), c.getString("source"),
+                    Direction.from3DDataValue(c.getInt("mount")),
+                    r >= 0 && r < rots.length ? rots[r] : Rotation.NONE,
+                    mi >= 0 && mi < mirrors.length ? mirrors[mi] : Mirror.NONE);
+            long[] sp = c.getLongArray("pos");
+            int[] ss = c.getIntArray("state");
+            int sn = Math.min(sp.length, ss.length);
+            for (int j = 0; j < sn; j++) s.blocks.put(sp[j], stateAt(palette, ss[j]));
+            loadStructure(s);
+        }
+    }
+
+    private static BlockState stateAt(BlockState[] palette, int index) {
+        return index >= 0 && index < palette.length ? palette[index] : net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+    }
+
+    private static final class Palette {
+        final List<BlockState> states = new ArrayList<>();
+        final it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap<BlockState> ids = new it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap<>();
+
+        Palette() {
+            ids.defaultReturnValue(-1);
+        }
+
+        int id(BlockState s) {
+            int i = ids.getInt(s);
+            if (i < 0) {
+                i = states.size();
+                states.add(s);
+                ids.put(s, i);
+            }
+            return i;
+        }
     }
 }

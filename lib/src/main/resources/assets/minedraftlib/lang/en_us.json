@@ -1,1 +1,11 @@
-{}
+{
+  "minedraftlib.msg.area_missing": "Area data not found",
+  "minedraftlib.msg.chunk_cannot_remove": "This chunk can't be removed",
+  "minedraftlib.msg.chunk_limit": "Reached the chunk limit of this area",
+  "minedraftlib.msg.chunk_not_adjacent": "The added chunks must connect to the area",
+  "minedraftlib.msg.chunk_split": "Removing these would split the area",
+  "minedraftlib.msg.no_session": "The editor session has ended",
+  "minedraftlib.msg.nothing_to_redo": "Nothing to redo",
+  "minedraftlib.msg.nothing_to_undo": "Nothing to undo",
+  "minedraftlib.msg.unknown_request": "Unknown edit"
+}

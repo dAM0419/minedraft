@@ -2,6 +2,12 @@ package dev.minedraft.lib;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
+import dev.minedraft.lib.area.AreaOps;
+import dev.minedraft.lib.client.LibClient;
+import dev.minedraft.lib.edit.EditRequests;
+import dev.minedraft.lib.net.LibNet;
+import dev.minedraft.lib.server.LibServerEvents;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import org.slf4j.Logger;
@@ -15,7 +21,12 @@ public final class MinedraftLib {
     public static final String MOD_ID = "minedraftlib";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public MinedraftLib(IEventBus modBus) {
+    public MinedraftLib(IEventBus modBus, Dist dist) {
+        AreaOps.bootstrap();
+        EditRequests.bootstrap();
+        modBus.addListener(LibNet.CHANNEL::register);
+        LibServerEvents.register();
+        if (dist.isClient()) LibClient.init(modBus);
     }
 
     public static ResourceLocation rl(String path) {

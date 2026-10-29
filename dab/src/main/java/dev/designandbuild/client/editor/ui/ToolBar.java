@@ -1,5 +1,7 @@
 package dev.designandbuild.client.editor.ui;
 
+import dev.minedraft.lib.edit.EditRequests;
+
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;
@@ -67,8 +69,8 @@ public final class ToolBar extends UiPart {
         for (int i = 0; i < 5; i++) {
             if (!Ui.inside(mx, my, x + 2, bottomY(i), B, B)) continue;
             switch (i) {
-                case 0 -> s().send(new Requests.Redo());
-                case 1 -> s().send(new Requests.Undo());
+                case 0 -> s().send(new EditRequests.Redo());
+                case 1 -> s().send(new EditRequests.Undo());
                 case 2 -> screen.toggleOutlines();
                 case 3 -> screen.tagView = !screen.tagView;
                 case 4 -> screen.showHelp = !screen.showHelp;

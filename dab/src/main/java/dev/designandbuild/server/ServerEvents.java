@@ -30,18 +30,14 @@ public final class ServerEvents {
 
     private static void onTick(ServerTickEvent.Post event) {
         BuildService.tick(event.getServer());
-        BlueprintManager manager = BlueprintManager.get();
-        if (manager != null) manager.tick();
     }
 
     private static void onStarted(ServerStartedEvent event) {
-        BlueprintManager.start(event.getServer());
         BuildService.reset();
         StructureLibrary.markDirty();
     }
 
     private static void onStopped(ServerStoppedEvent event) {
-        BlueprintManager.stop();
         BuildService.reset();
         StructureLibrary.markDirty();
     }
@@ -52,8 +48,6 @@ public final class ServerEvents {
 
     private static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            BlueprintManager manager = BlueprintManager.get();
-            if (manager != null) manager.onLogout(player);
             BuildService.onLogout(player);
             Net.forgetPlayer(player.getUUID());
         }

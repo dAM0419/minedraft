@@ -466,7 +466,7 @@ public final class ToolLogic {
         ClientConfig.touchRecent(source);
         if (s.placeOp == EditorSession.Op.ERASE) {
             // 조각 모양대로 지운다: 구조물을 선택했으면 그 구조물에서, 아니면 지형 층에서 (직접조작 지우기와 같음)
-            int group = dev.designandbuild.client.ClientStore.nextGroup();
+            int group = dev.minedraft.lib.client.ClientAreas.nextGroup();
             if (s.selected != 0) {
                 s.send(new Requests.StructCells(group, s.selected, "", pos, states));
             } else {

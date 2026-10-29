@@ -1,6 +1,11 @@
 package dev.designandbuild.core;
 
+import dev.designandbuild.DesignAndBuild;
+import dev.minedraft.lib.area.Area;
+import dev.minedraft.lib.area.AreaOp;
+import dev.minedraft.lib.area.AreaOps;
 import dev.minedraft.lib.util.CellIO;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.block.Mirror;
@@ -16,24 +21,37 @@ public final class ModelOps {
 
     public static final int MAX_CELLS = 4_000_000;
 
-    public sealed interface Op permits Terrain, StructCreate, StructCells, StructReplace, StructDelete,
-            StructReorder, StructRename, Rename, ChunkAdd, ChunkRemove {
+    /** DaB 설계층 변경. Lib 의 영역 변경(AreaOp)으로 오가고, 적용은 그 영역의 설계층에 한다. */
+    public sealed interface Op extends AreaOp permits Terrain, StructCreate, StructCells, StructReplace, StructDelete,
+            StructReorder, StructRename {
         void apply(BlueprintModel m);
 
-        void write(FriendlyByteBuf buf);
+        @Override
+        default void apply(Area area) {
+            apply(BlueprintModel.of(area));
+        }
     }
 
-    private static final int TERRAIN = 1, STRUCT_CREATE = 2, STRUCT_CELLS = 3, STRUCT_REPLACE = 4, STRUCT_DELETE = 5,
-            STRUCT_REORDER = 6, STRUCT_RENAME = 7, RENAME = 8, CHUNK_ADD = 9, CHUNK_REMOVE = 10;
+    public static final ResourceLocation TERRAIN = DesignAndBuild.rl("terrain"), STRUCT_CREATE = DesignAndBuild.rl("struct_create"),
+            STRUCT_CELLS = DesignAndBuild.rl("struct_cells"), STRUCT_REPLACE = DesignAndBuild.rl("struct_replace"),
+            STRUCT_DELETE = DesignAndBuild.rl("struct_delete"), STRUCT_REORDER = DesignAndBuild.rl("struct_reorder"),
+            STRUCT_RENAME = DesignAndBuild.rl("struct_rename");
 
-    public static Op read(FriendlyByteBuf buf) {
-        int kind = buf.readByte();
-        return switch (kind) {
-            case TERRAIN -> {
+    /** 읽기 함수를 Lib 에 등록한다 (모드 생성자). */
+    public static void register() {
+        for (ResourceLocation k : new ResourceLocation[]{TERRAIN, STRUCT_CREATE, STRUCT_CELLS, STRUCT_REPLACE, STRUCT_DELETE,
+                STRUCT_REORDER, STRUCT_RENAME}) {
+            AreaOps.register(k, buf -> read(k, buf));
+        }
+    }
+
+    private static Op read(ResourceLocation kind, FriendlyByteBuf buf) {
+        return switch (kind.getPath()) {
+            case "terrain" -> {
                 long[] pos = CellIO.readPositions(buf, MAX_CELLS);
                 yield new Terrain(pos, CellIO.readStates(buf, pos.length), DesignTag.readAll(buf, pos.length));
             }
-            case STRUCT_CREATE -> {
+            case "struct_create" -> {
                 int id = buf.readVarInt();
                 int index = buf.readVarInt();
                 String name = buf.readUtf();
@@ -44,30 +62,32 @@ public final class ModelOps {
                 long[] pos = CellIO.readPositions(buf, MAX_CELLS);
                 yield new StructCreate(id, index, name, source, mount, rot, mirror, pos, CellIO.readStates(buf, pos.length));
             }
-            case STRUCT_CELLS -> {
+            case "struct_cells" -> {
                 int id = buf.readVarInt();
                 long[] pos = CellIO.readPositions(buf, MAX_CELLS);
                 yield new StructCells(id, pos, CellIO.readStates(buf, pos.length));
             }
-            case STRUCT_REPLACE -> {
+            case "struct_replace" -> {
                 int id = buf.readVarInt();
                 Rotation rot = CellIO.readRotation(buf);
                 Mirror mirror = CellIO.readMirror(buf);
                 long[] pos = CellIO.readPositions(buf, MAX_CELLS);
                 yield new StructReplace(id, rot, mirror, pos, CellIO.readStates(buf, pos.length));
             }
-            case STRUCT_DELETE -> new StructDelete(buf.readVarInt());
-            case STRUCT_REORDER -> new StructReorder(buf.readVarInt(), buf.readVarInt());
-            case STRUCT_RENAME -> new StructRename(buf.readVarInt(), buf.readUtf());
-            case RENAME -> new Rename(buf.readUtf());
-            case CHUNK_ADD -> new ChunkAdd(buf.readLong());
-            case CHUNK_REMOVE -> new ChunkRemove(buf.readLong());
+            case "struct_delete" -> new StructDelete(buf.readVarInt());
+            case "struct_reorder" -> new StructReorder(buf.readVarInt(), buf.readVarInt());
+            case "struct_rename" -> new StructRename(buf.readVarInt(), buf.readUtf());
             default -> throw new IllegalArgumentException("Unknown op " + kind);
         };
     }
 
     /** 지형 층 칸 쓰기 (상태 null = 지형 설계 삭제). */
     public record Terrain(long[] pos, BlockState[] states, DesignTag[] tags) implements Op {
+        @Override
+        public ResourceLocation type() {
+            return TERRAIN;
+        }
+
         @Override
         public void apply(BlueprintModel m) {
             for (int i = 0; i < pos.length; i++) {
@@ -80,7 +100,6 @@ public final class ModelOps {
 
         @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(TERRAIN);
             CellIO.writePositions(buf, pos);
             CellIO.writeStates(buf, states);
             DesignTag.writeAll(buf, tags);
@@ -90,6 +109,11 @@ public final class ModelOps {
     /** 구조물 생성 (index 위치에 끼워 넣음, -1 = 맨 뒤). */
     public record StructCreate(int id, int index, String name, String source, Direction mount, Rotation rotation,
                                Mirror mirror, long[] pos, BlockState[] states) implements Op {
+        @Override
+        public ResourceLocation type() {
+            return STRUCT_CREATE;
+        }
+
         @Override
         public void apply(BlueprintModel m) {
             StructureInstance s = m.createStructure(id, index, name, source, mount, rotation, mirror);
@@ -102,7 +126,6 @@ public final class ModelOps {
 
         @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_CREATE);
             buf.writeVarInt(id);
             buf.writeVarInt(index);
             buf.writeUtf(name);
@@ -118,6 +141,11 @@ public final class ModelOps {
     /** 구조물 칸 쓰기 (상태 null = 그 칸을 구조물에서 뺌). */
     public record StructCells(int id, long[] pos, BlockState[] states) implements Op {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_CELLS;
+        }
+
+        @Override
         public void apply(BlueprintModel m) {
             StructureInstance s = m.structure(id);
             if (s == null) return;
@@ -130,7 +158,6 @@ public final class ModelOps {
 
         @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_CELLS);
             buf.writeVarInt(id);
             CellIO.writePositions(buf, pos);
             CellIO.writeStates(buf, states);
@@ -139,6 +166,11 @@ public final class ModelOps {
 
     /** 구조물 블록 전체 교체 (이동·회전·반전, 되돌리기). */
     public record StructReplace(int id, Rotation rotation, Mirror mirror, long[] pos, BlockState[] states) implements Op {
+        @Override
+        public ResourceLocation type() {
+            return STRUCT_REPLACE;
+        }
+
         @Override
         public void apply(BlueprintModel m) {
             StructureInstance s = m.structure(id);
@@ -155,7 +187,6 @@ public final class ModelOps {
 
         @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_REPLACE);
             buf.writeVarInt(id);
             CellIO.writeRotation(buf, rotation);
             CellIO.writeMirror(buf, mirror);
@@ -166,6 +197,11 @@ public final class ModelOps {
 
     public record StructDelete(int id) implements Op {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_DELETE;
+        }
+
+        @Override
         public void apply(BlueprintModel m) {
             m.deleteStructure(id);
             m.flush();
@@ -173,12 +209,16 @@ public final class ModelOps {
 
         @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_DELETE);
             buf.writeVarInt(id);
         }
     }
 
     public record StructReorder(int id, int index) implements Op {
+        @Override
+        public ResourceLocation type() {
+            return STRUCT_REORDER;
+        }
+
         @Override
         public void apply(BlueprintModel m) {
             m.moveInOrder(id, index);
@@ -187,7 +227,6 @@ public final class ModelOps {
 
         @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_REORDER);
             buf.writeVarInt(id);
             buf.writeVarInt(index);
         }
@@ -195,55 +234,20 @@ public final class ModelOps {
 
     public record StructRename(int id, String name) implements Op {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_RENAME;
+        }
+
+        @Override
         public void apply(BlueprintModel m) {
             m.renameStructure(id, name);
         }
 
         @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_RENAME);
             buf.writeVarInt(id);
             buf.writeUtf(name);
         }
     }
 
-    public record Rename(String name) implements Op {
-        @Override
-        public void apply(BlueprintModel m) {
-            m.rename(name);
-        }
-
-        @Override
-        public void write(FriendlyByteBuf buf) {
-            buf.writeByte(RENAME);
-            buf.writeUtf(name);
-        }
-    }
-
-    public record ChunkAdd(long chunk) implements Op {
-        @Override
-        public void apply(BlueprintModel m) {
-            m.addChunk(chunk);
-        }
-
-        @Override
-        public void write(FriendlyByteBuf buf) {
-            buf.writeByte(CHUNK_ADD);
-            buf.writeLong(chunk);
-        }
-    }
-
-    public record ChunkRemove(long chunk) implements Op {
-        @Override
-        public void apply(BlueprintModel m) {
-            m.removeChunk(chunk);
-            m.flush();
-        }
-
-        @Override
-        public void write(FriendlyByteBuf buf) {
-            buf.writeByte(CHUNK_REMOVE);
-            buf.writeLong(chunk);
-        }
-    }
 }

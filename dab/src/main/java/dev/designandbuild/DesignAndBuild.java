@@ -25,6 +25,11 @@ public final class DesignAndBuild {
 
     public DesignAndBuild(IEventBus modBus, ModContainer container) {
         Registration.register(modBus);
+        // Minedraft Lib 에 도면 영역 종류·설계 변경·편집 요청·되돌리기를 등록한다 (서버·클라이언트 공통)
+        dev.minedraft.lib.area.AreaType.register(dev.designandbuild.core.BlueprintModel.AREA_TYPE);
+        dev.designandbuild.core.ModelOps.register();
+        dev.designandbuild.server.DesignEdits.register();
+        dev.designandbuild.server.DesignUndo.register();
         modBus.addListener(Net::register);
         modBus.addListener(DesignAndBuild::buildCreativeTabs);
         ServerEvents.init();

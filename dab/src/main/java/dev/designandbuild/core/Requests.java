@@ -1,6 +1,9 @@
 package dev.designandbuild.core;
 
+import dev.designandbuild.DesignAndBuild;
+import dev.minedraft.lib.edit.EditRequest;
 import dev.minedraft.lib.util.CellIO;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.block.Mirror;
@@ -14,30 +17,30 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class Requests {
     private Requests() {}
 
-    public sealed interface Req permits Terrain, StructCells, StructCreate, StructMove, StructDelete, StructReorder,
-            StructRename, Rename, ChunkChange, Undo, Redo {
-        void write(FriendlyByteBuf buf);
-    }
+    /** DaB 설계 편집 요청 (Lib 의 편집 요청으로 오간다). 이름 바꾸기·청크·되돌리기는 Lib 기본 요청을 쓴다. */
+    public sealed interface Req extends EditRequest permits Terrain, StructCells, StructCreate, StructMove, StructDelete,
+            StructReorder, StructRename {}
 
-    private static final int TERRAIN = 1, STRUCT_CELLS = 2, STRUCT_CREATE = 3, STRUCT_MOVE = 4, STRUCT_DELETE = 5,
-            STRUCT_REORDER = 6, STRUCT_RENAME = 7, RENAME = 8, CHUNK_CHANGE = 9, UNDO = 11, REDO = 12;
+    public static final ResourceLocation TERRAIN = DesignAndBuild.rl("terrain"), STRUCT_CELLS = DesignAndBuild.rl("struct_cells"),
+            STRUCT_CREATE = DesignAndBuild.rl("struct_create"), STRUCT_MOVE = DesignAndBuild.rl("struct_move"),
+            STRUCT_DELETE = DesignAndBuild.rl("struct_delete"), STRUCT_REORDER = DesignAndBuild.rl("struct_reorder"),
+            STRUCT_RENAME = DesignAndBuild.rl("struct_rename");
 
-    public static Req read(FriendlyByteBuf buf) {
-        int kind = buf.readByte();
-        return switch (kind) {
-            case TERRAIN -> {
+    public static Req read(ResourceLocation kind, FriendlyByteBuf buf) {
+        return switch (kind.getPath()) {
+            case "terrain" -> {
                 int group = buf.readVarInt();
                 long[] pos = CellIO.readPositions(buf, ModelOps.MAX_CELLS);
                 yield new Terrain(group, pos, CellIO.readStates(buf, pos.length), DesignTag.readAll(buf, pos.length));
             }
-            case STRUCT_CELLS -> {
+            case "struct_cells" -> {
                 int group = buf.readVarInt();
                 int id = buf.readVarInt();
                 String name = buf.readUtf();
                 long[] pos = CellIO.readPositions(buf, ModelOps.MAX_CELLS);
                 yield new StructCells(group, id, name, pos, CellIO.readStates(buf, pos.length));
             }
-            case STRUCT_CREATE -> {
+            case "struct_create" -> {
                 int group = buf.readVarInt();
                 String name = buf.readUtf();
                 String source = buf.readUtf();
@@ -47,15 +50,11 @@ public final class Requests {
                 long[] pos = CellIO.readPositions(buf, ModelOps.MAX_CELLS);
                 yield new StructCreate(group, name, source, mount, rot, mirror, pos, CellIO.readStates(buf, pos.length));
             }
-            case STRUCT_MOVE -> new StructMove(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(),
+            case "struct_move" -> new StructMove(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(),
                     buf.readVarInt(), buf.readBoolean());
-            case STRUCT_DELETE -> new StructDelete(buf.readVarInt());
-            case STRUCT_REORDER -> new StructReorder(buf.readVarInt(), buf.readVarInt());
-            case STRUCT_RENAME -> new StructRename(buf.readVarInt(), buf.readUtf());
-            case RENAME -> new Rename(buf.readUtf());
-            case CHUNK_CHANGE -> new ChunkChange(readChunks(buf), readChunks(buf));
-            case UNDO -> new Undo();
-            case REDO -> new Redo();
+            case "struct_delete" -> new StructDelete(buf.readVarInt());
+            case "struct_reorder" -> new StructReorder(buf.readVarInt(), buf.readVarInt());
+            case "struct_rename" -> new StructRename(buf.readVarInt(), buf.readUtf());
             default -> throw new IllegalArgumentException("Unknown request " + kind);
         };
     }
@@ -63,8 +62,12 @@ public final class Requests {
     /** 지형 층에 쓰기. 태그는 FLOOR / PATH, 철거는 공기 + NONE. */
     public record Terrain(int group, long[] pos, BlockState[] states, DesignTag[] tags) implements Req {
         @Override
+        public ResourceLocation type() {
+            return TERRAIN;
+        }
+
+        @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(TERRAIN);
             buf.writeVarInt(group);
             CellIO.writePositions(buf, pos);
             CellIO.writeStates(buf, states);
@@ -75,8 +78,12 @@ public final class Requests {
     /** 구조물 칸 쓰기. id 0 = 새 구조물을 name 으로 만든다. 상태 공기 = 공기 지정. */
     public record StructCells(int group, int id, String name, long[] pos, BlockState[] states) implements Req {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_CELLS;
+        }
+
+        @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_CELLS);
             buf.writeVarInt(group);
             buf.writeVarInt(id);
             buf.writeUtf(name);
@@ -89,8 +96,12 @@ public final class Requests {
     public record StructCreate(int group, String name, String source, Direction mount, Rotation rotation, Mirror mirror,
                                long[] pos, BlockState[] states) implements Req {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_CREATE;
+        }
+
+        @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_CREATE);
             buf.writeVarInt(group);
             buf.writeUtf(name);
             buf.writeUtf(source);
@@ -105,8 +116,12 @@ public final class Requests {
     /** 이동(dx,dy,dz) 후 볼륨 기준 회전(시계 방향 90° × steps)·좌우 반전. */
     public record StructMove(int id, int dx, int dy, int dz, int rotSteps, boolean mirror) implements Req {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_MOVE;
+        }
+
+        @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_MOVE);
             buf.writeVarInt(id);
             buf.writeVarInt(dx);
             buf.writeVarInt(dy);
@@ -118,16 +133,24 @@ public final class Requests {
 
     public record StructDelete(int id) implements Req {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_DELETE;
+        }
+
+        @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_DELETE);
             buf.writeVarInt(id);
         }
     }
 
     public record StructReorder(int id, int index) implements Req {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_REORDER;
+        }
+
+        @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_REORDER);
             buf.writeVarInt(id);
             buf.writeVarInt(index);
         }
@@ -135,55 +158,14 @@ public final class Requests {
 
     public record StructRename(int id, String name) implements Req {
         @Override
+        public ResourceLocation type() {
+            return STRUCT_RENAME;
+        }
+
+        @Override
         public void write(FriendlyByteBuf buf) {
-            buf.writeByte(STRUCT_RENAME);
             buf.writeVarInt(id);
             buf.writeUtf(name);
-        }
-    }
-
-    public record Rename(String name) implements Req {
-        @Override
-        public void write(FriendlyByteBuf buf) {
-            buf.writeByte(RENAME);
-            buf.writeUtf(name);
-        }
-    }
-
-    /** 청크 여러 개를 한꺼번에 넣고 뺀다 (결과 영역 기준으로 검사). */
-    public record ChunkChange(long[] add, long[] remove) implements Req {
-        @Override
-        public void write(FriendlyByteBuf buf) {
-            buf.writeByte(CHUNK_CHANGE);
-            writeChunks(buf, add);
-            writeChunks(buf, remove);
-        }
-    }
-
-    private static void writeChunks(FriendlyByteBuf buf, long[] chunks) {
-        buf.writeVarInt(chunks.length);
-        for (long c : chunks) buf.writeLong(c);
-    }
-
-    private static long[] readChunks(FriendlyByteBuf buf) {
-        int n = buf.readVarInt();
-        if (n < 0 || n > 256) throw new IllegalArgumentException("Too many chunks: " + n);
-        long[] out = new long[n];
-        for (int i = 0; i < n; i++) out[i] = buf.readLong();
-        return out;
-    }
-
-    public record Undo() implements Req {
-        @Override
-        public void write(FriendlyByteBuf buf) {
-            buf.writeByte(UNDO);
-        }
-    }
-
-    public record Redo() implements Req {
-        @Override
-        public void write(FriendlyByteBuf buf) {
-            buf.writeByte(REDO);
         }
     }
 }

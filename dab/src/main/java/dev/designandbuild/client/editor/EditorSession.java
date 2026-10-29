@@ -3,7 +3,14 @@ package dev.designandbuild.client.editor;
 import dev.minedraft.lib.client.editor.Snapshot;
 import dev.minedraft.lib.client.editor.EditorColors;
 import dev.minedraft.lib.client.editor.EditorCamera;
-import dev.designandbuild.client.ClientStore;
+import dev.minedraft.lib.area.Area;
+import dev.minedraft.lib.area.AreaOp;
+import dev.minedraft.lib.area.AreaOps;
+import dev.minedraft.lib.client.ClientAreas;
+import dev.minedraft.lib.client.ClientEditor;
+import dev.minedraft.lib.edit.EditRequest;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.FriendlyByteBuf;
 import dev.designandbuild.client.library.LibraryEntry;
 import dev.designandbuild.core.BlueprintModel;
 import dev.minedraft.lib.util.Box;
@@ -39,7 +46,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /** 열려 있는 편집창 하나의 상태. 화면(EditorScreen)은 이 상태를 그리고 입력을 넘긴다. */
-public final class EditorSession {
+public final class EditorSession implements ClientEditor {
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 
     public enum Tool { SELECT, DIRECT, PLACE }
@@ -169,6 +176,7 @@ public final class EditorSession {
         model.addListener(blockListener);
     }
 
+    @Override
     public void dispose() {
         model.removeListener(blockListener);
         if (renderer != null) {
@@ -548,6 +556,11 @@ public final class EditorSession {
     // 스냅샷 수신
     // ------------------------------------------------------------------
 
+    @Override
+    public void onSnapshot(FriendlyByteBuf buf, RegistryAccess access) {
+        onSnapshotChunk(snapshot.read(buf, access));
+    }
+
     public void onSnapshotChunk(long chunk) {
         if (ready && renderer != null) {
             computeRenderMinY();
@@ -555,6 +568,7 @@ public final class EditorSession {
         }
     }
 
+    @Override
     public void onReady() {
         ready = true;
         computeRenderMinY();
@@ -676,20 +690,13 @@ public final class EditorSession {
     // 서버로 보내기
     // ------------------------------------------------------------------
 
-    public int send(Requests.Req req) {
-        int seq = ClientStore.nextSeq();
+    public int send(EditRequest req) {
         pending++;
-        UUID id = model.id;
-        Net.toServer(Msg.C_EDIT, buf -> {
-            buf.writeUUID(id);
-            buf.writeVarInt(seq);
-            req.write(buf);
-        });
-        return seq;
+        return ClientAreas.send(model.area, req);
     }
 
     /** 새 구조물을 만드는 요청: 응답이 오면 그 구조물을 선택한다. */
-    public void sendCreating(Requests.Req req) {
+    public void sendCreating(EditRequest req) {
         awaitingCreateSeq = send(req);
     }
 
@@ -710,7 +717,8 @@ public final class EditorSession {
         for (Requests.StructCells q : list) send(new Requests.StructCells(q.group(), createdId, "", q.pos(), q.states()));
     }
 
-    public void onApplied(UUID actor, int seq, List<ModelOps.Op> ops) {
+    @Override
+    public void onApplied(UUID actor, int seq, List<AreaOp> ops) {
         Minecraft mc = Minecraft.getInstance();
         boolean mine = mc.player != null && actor.equals(mc.player.getUUID()) && seq != 0;
         if (mine) {
@@ -718,7 +726,7 @@ public final class EditorSession {
             if (seq == awaitingCreateSeq) {
                 awaitingCreateSeq = -1;
                 int created = 0;
-                for (ModelOps.Op op : ops) {
+                for (AreaOp op : ops) {
                     if (op instanceof ModelOps.StructCreate c) created = c.id();
                 }
                 if (created != 0) {
@@ -731,7 +739,7 @@ public final class EditorSession {
         } else {
             int color = EditorColors.editorColor(actor);
             long now = System.currentTimeMillis();
-            for (ModelOps.Op op : ops) {
+            for (AreaOp op : ops) {
                 long[] pos = switch (op) {
                     case ModelOps.Terrain t -> t.pos();
                     case ModelOps.StructCells t -> t.pos();
@@ -746,10 +754,10 @@ public final class EditorSession {
             }
         }
         int lowest = Integer.MAX_VALUE;
-        for (ModelOps.Op op : ops) {
-            if (op instanceof ModelOps.ChunkAdd || op instanceof ModelOps.ChunkRemove) {
-                long c = op instanceof ModelOps.ChunkAdd a ? a.chunk() : ((ModelOps.ChunkRemove) op).chunk();
-                if (op instanceof ModelOps.ChunkRemove) snapshot.remove(c);
+        for (AreaOp op : ops) {
+            if (op instanceof AreaOps.ChunkAdd || op instanceof AreaOps.ChunkRemove) {
+                long c = op instanceof AreaOps.ChunkAdd a ? a.chunk() : ((AreaOps.ChunkRemove) op).chunk();
+                if (op instanceof AreaOps.ChunkRemove) snapshot.remove(c);
                 if (renderer != null) renderer.markChunkArea(c);
             }
             long[] pos = switch (op) {
@@ -766,6 +774,7 @@ public final class EditorSession {
         if (selected != 0 && model.structure(selected) == null) selected = 0;
     }
 
+    @Override
     public void onRejected(int seq, String key) {
         pending = Math.max(0, pending - 1);
         if (seq == awaitingCreateSeq) {
@@ -780,6 +789,11 @@ public final class EditorSession {
     }
 
     /** 서버가 도면 전체를 다시 보냄 (순서가 어긋났을 때). */
+    @Override
+    public void onAreaReplaced(Area area) {
+        replaceModel(BlueprintModel.of(area));
+    }
+
     public void replaceModel(BlueprintModel newModel) {
         model.removeListener(blockListener);
         model = newModel;
@@ -788,6 +802,7 @@ public final class EditorSession {
         if (renderer != null) renderer.markAll();
     }
 
+    @Override
     public void toast(Component text) {
         long now = System.currentTimeMillis();
         if (!toasts.isEmpty()) {
@@ -833,5 +848,41 @@ public final class EditorSession {
 
     public String newStructureName() {
         return Component.translatable("designandbuild.structure.default", model.nextStructureId).getString();
+    }
+
+    // ------------------------------------------------------------------
+    // Lib 편집창 연결 (ClientEditor)
+    // ------------------------------------------------------------------
+
+    @Override
+    public Area area() {
+        return model.area;
+    }
+
+    @Override
+    public void onEditors(List<UUID> ids, List<String> names) {
+        editors.clear();
+        for (int i = 0; i < ids.size(); i++) editors.put(ids.get(i), names.get(i));
+        cursors.keySet().removeIf(u -> !editors.containsKey(u));
+    }
+
+    @Override
+    public void onCursor(UUID from, byte[] data) {
+        FriendlyByteBuf b = new FriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(data));
+        boolean has = b.readBoolean();
+        long pos = b.readLong();
+        Box region = new Box(b.readInt(), b.readInt(), b.readInt(), b.readInt(), b.readInt(), b.readInt());
+        int sel = b.readVarInt();
+        cursors.put(from, new RemoteCursor(from, has, pos, region, sel, System.currentTimeMillis()));
+    }
+
+    @Override
+    public boolean isShowing() {
+        return Minecraft.getInstance().screen instanceof EditorScreen;
+    }
+
+    @Override
+    public void closeScreen() {
+        if (isShowing()) Minecraft.getInstance().setScreen(null);
     }
 }

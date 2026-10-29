@@ -1,6 +1,13 @@
 package dev.designandbuild.server;
 
+import dev.designandbuild.DesignAndBuild;
 import dev.designandbuild.core.BlueprintModel;
+import dev.minedraft.lib.area.Area;
+import dev.minedraft.lib.area.AreaOp;
+import dev.minedraft.lib.edit.UndoChange;
+import dev.minedraft.lib.edit.UndoHistory;
+import dev.minedraft.lib.edit.UndoInverter;
+import net.minecraft.resources.ResourceLocation;
 import dev.designandbuild.core.DesignTag;
 import dev.designandbuild.core.ModelOps;
 import dev.designandbuild.core.StructureInstance;
@@ -22,64 +29,24 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 플레이어 한 명이 도면 하나에 한 편집 기록. 되돌리기는 "내가 바꾼 뒤 아무도 건드리지 않은 칸"만 되돌린다.
+ * DaB 설계층의 되돌리기 (Lib 되돌리기 기록의 "design" 영역). 되돌리기는 "내가 바꾼 뒤 아무도 건드리지 않은 칸"만 되돌린다.
  */
-public final class UndoHistory {
-    private static final int LIMIT = 100;
+public final class DesignUndo implements UndoInverter {
+    public static final ResourceLocation DOMAIN = DesignAndBuild.rl("design");
 
-    private final Deque<Entry> undo = new ArrayDeque<>();
-    private final Deque<Entry> redo = new ArrayDeque<>();
-
-    public static final class Entry {
-        final int group;
-        final List<Change> changes = new ArrayList<>();
-
-        Entry(int group) {
-            this.group = group;
-        }
-
-        public boolean isEmpty() {
-            return changes.isEmpty();
-        }
-    }
-
-    public Entry newEntry(int group) {
-        return new Entry(group);
-    }
-
-    public void push(Entry entry) {
-        if (entry.isEmpty()) return;
-        redo.clear();
-        Entry last = undo.peekLast();
-        if (last != null && entry.group != 0 && last.group == entry.group) {
-            last.changes.addAll(entry.changes);
-            return;
-        }
-        undo.addLast(entry);
-        while (undo.size() > LIMIT) undo.removeFirst();
-    }
-
-    /** 되돌리기. 적용할 연산을 out 에 담는다. 되돌릴 게 없으면 false. */
-    public boolean undo(BlueprintModel m, List<ModelOps.Op> out) {
-        Entry e = undo.pollLast();
-        if (e == null) return false;
-        Entry inverse = invert(m, e, out);
-        if (!inverse.isEmpty()) redo.addLast(inverse);
-        return true;
-    }
-
-    public boolean redo(BlueprintModel m, List<ModelOps.Op> out) {
-        Entry e = redo.pollLast();
-        if (e == null) return false;
-        Entry inverse = invert(m, e, out);
-        if (!inverse.isEmpty()) undo.addLast(inverse);
-        return true;
+    public static void register() {
+        UndoHistory.registerInverter(DOMAIN, new DesignUndo());
     }
 
     // ------------------------------------------------------------------
 
-    sealed interface Change permits TerrainChange, StructCellChange, StructCreated, StructDeleted, StructReplaced,
-            StructReordered, StructRenamed, BlueprintRenamed {}
+    sealed interface Change extends UndoChange permits TerrainChange, StructCellChange, StructCreated, StructDeleted,
+            StructReplaced, StructReordered, StructRenamed {
+        @Override
+        default ResourceLocation domain() {
+            return DOMAIN;
+        }
+    }
 
     record TerrainChange(long pos, @Nullable TerrainCell before, @Nullable TerrainCell after) implements Change {}
 
@@ -96,8 +63,6 @@ public final class UndoHistory {
     record StructReordered(int id, int before, int after) implements Change {}
 
     record StructRenamed(int id, String before, String after) implements Change {}
-
-    record BlueprintRenamed(String before, String after) implements Change {}
 
     /** 구조물 전체 사본 (삭제 되돌리기용). */
     record Snapshot(int id, int index, String name, String source, Direction mount, Rotation rotation, Mirror mirror,
@@ -200,18 +165,20 @@ public final class UndoHistory {
         }
     }
 
-    private static Entry invert(BlueprintModel m, Entry e, List<ModelOps.Op> out) {
-        Entry inverse = new Entry(0);
+    @Override
+    public List<UndoChange> invert(Area area, List<UndoChange> changes, List<AreaOp> out) {
+        BlueprintModel m = BlueprintModel.of(area);
+        List<UndoChange> inverseChanges = new ArrayList<>();
         OpBuilder ops = new OpBuilder(out);
         Virtual view = new Virtual(m);
-        for (int i = e.changes.size() - 1; i >= 0; i--) {
-            Change c = e.changes.get(i);
+        for (int i = changes.size() - 1; i >= 0; i--) {
+            if (!(changes.get(i) instanceof Change c)) continue;
             switch (c) {
                 case TerrainChange t -> {
                     if (Objects.equals(view.terrainAt(t.pos), t.after)) {
                         ops.terrain(t.pos, t.before);
                         view.setTerrain(t.pos, t.before);
-                        inverse.changes.add(new TerrainChange(t.pos, t.after, t.before));
+                        inverseChanges.add(new TerrainChange(t.pos, t.after, t.before));
                     }
                 }
                 case StructCellChange s -> {
@@ -219,7 +186,7 @@ public final class UndoHistory {
                     if (st != null && view.structAt(st, s.pos) == s.after) {
                         ops.structCell(s.id, s.pos, s.before);
                         view.setStruct(s.id, s.pos, s.before);
-                        inverse.changes.add(new StructCellChange(s.id, s.pos, s.after, s.before));
+                        inverseChanges.add(new StructCellChange(s.id, s.pos, s.after, s.before));
                     }
                 }
                 case StructCreated s -> {
@@ -228,7 +195,7 @@ public final class UndoHistory {
                         Snapshot snap = view.snapshot(st);
                         ops.flush();
                         out.add(new ModelOps.StructDelete(s.id));
-                        inverse.changes.add(new StructDeleted(snap));
+                        inverseChanges.add(new StructDeleted(snap));
                     }
                 }
                 case StructDeleted s -> {
@@ -237,7 +204,7 @@ public final class UndoHistory {
                         ops.flush();
                         out.add(new ModelOps.StructCreate(snap.id(), snap.index(), snap.name(), snap.source(), snap.mount(),
                                 snap.rotation(), snap.mirror(), snap.pos(), snap.states()));
-                        inverse.changes.add(new StructCreated(snap.id(), hashOf(snap.pos(), snap.states())));
+                        inverseChanges.add(new StructCreated(snap.id(), hashOf(snap.pos(), snap.states())));
                     }
                 }
                 case StructReplaced s -> {
@@ -246,7 +213,7 @@ public final class UndoHistory {
                         Snapshot now = view.snapshot(st);
                         ops.flush();
                         out.add(new ModelOps.StructReplace(s.id, s.beforeRot, s.beforeMirror, s.beforePos, s.beforeStates));
-                        inverse.changes.add(new StructReplaced(s.id, now.pos(), now.states(), now.rotation(), now.mirror(),
+                        inverseChanges.add(new StructReplaced(s.id, now.pos(), now.states(), now.rotation(), now.mirror(),
                                 hashOf(s.beforePos, s.beforeStates)));
                     }
                 }
@@ -254,7 +221,7 @@ public final class UndoHistory {
                     if (m.structure(s.id) != null && m.orderIndexOf(s.id) == s.after) {
                         ops.flush();
                         out.add(new ModelOps.StructReorder(s.id, s.before));
-                        inverse.changes.add(new StructReordered(s.id, s.after, s.before));
+                        inverseChanges.add(new StructReordered(s.id, s.after, s.before));
                     }
                 }
                 case StructRenamed s -> {
@@ -262,27 +229,37 @@ public final class UndoHistory {
                     if (st != null && st.name.equals(s.after)) {
                         ops.flush();
                         out.add(new ModelOps.StructRename(s.id, s.before));
-                        inverse.changes.add(new StructRenamed(s.id, s.after, s.before));
-                    }
-                }
-                case BlueprintRenamed s -> {
-                    if (m.name.equals(s.after)) {
-                        ops.flush();
-                        out.add(new ModelOps.Rename(s.before));
-                        inverse.changes.add(new BlueprintRenamed(s.after, s.before));
+                        inverseChanges.add(new StructRenamed(s.id, s.after, s.before));
                     }
                 }
             }
         }
         ops.flush();
         // 다시 하기는 원래 순서대로 적용되어야 하므로 뒤집는다
-        java.util.Collections.reverse(inverse.changes);
-        return inverse;
+        java.util.Collections.reverse(inverseChanges);
+        return inverseChanges;
+    }
+
+    /** 적용 직후: 생성·교체 기록의 "직후 내용 해시"를 채운다. */
+    @Override
+    public void finish(Area area, List<UndoChange> changes) {
+        BlueprintModel m = BlueprintModel.of(area);
+        for (int i = 0; i < changes.size(); i++) {
+            UndoChange c = changes.get(i);
+            if (c instanceof StructCreated sc) {
+                StructureInstance s = m.structure(sc.id());
+                changes.set(i, new StructCreated(sc.id(), s == null ? 0 : s.contentHash()));
+            } else if (c instanceof StructReplaced sr) {
+                StructureInstance s = m.structure(sr.id());
+                changes.set(i, new StructReplaced(sr.id(), sr.beforePos(), sr.beforeStates(), sr.beforeRot(), sr.beforeMirror(),
+                        s == null ? 0 : s.contentHash()));
+            }
+        }
     }
 
     /** 연속된 같은 종류의 칸 변경을 연산 하나로 묶는다. */
     private static final class OpBuilder {
-        private final List<ModelOps.Op> out;
+        private final List<AreaOp> out;
         private final List<Long> tPos = new ArrayList<>();
         private final List<BlockState> tStates = new ArrayList<>();
         private final List<DesignTag> tTags = new ArrayList<>();
@@ -290,7 +267,7 @@ public final class UndoHistory {
         private final List<Long> sPos = new ArrayList<>();
         private final List<BlockState> sStates = new ArrayList<>();
 
-        OpBuilder(List<ModelOps.Op> out) {
+        OpBuilder(List<AreaOp> out) {
             this.out = out;
         }
 

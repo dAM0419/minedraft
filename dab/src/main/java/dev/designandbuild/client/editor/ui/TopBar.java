@@ -42,7 +42,7 @@ public final class TopBar extends UiPart {
         String status = s.pending > 0 ? Component.translatable("designandbuild.editor.saving").getString()
                 : Component.translatable("designandbuild.editor.saved").getString();
         int statusColor = s.pending > 0 ? Ui.WARN : Ui.DIM;
-        String name = Ui.clip(s.model.name, Math.max(40, w / 3 - 80));
+        String name = Ui.clip(s.model.name(), Math.max(40, w / 3 - 80));
         Ui.text(g, name, x + 21, y + 4, Ui.TEXT);
         Ui.text(g, status, x + 25 + Ui.font().width(name), y + 4, statusColor);
 

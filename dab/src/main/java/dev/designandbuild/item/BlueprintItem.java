@@ -71,6 +71,6 @@ public class BlueprintItem extends Item {
         BlueprintManager manager = BlueprintManager.get();
         if (ref == null || manager == null) return;
         BlueprintModel m = manager.model(ref.id());
-        if (m != null && !m.name.equals(ref.name())) stack.set(Registration.BLUEPRINT_REF.get(), ref.withName(m.name));
+        if (m != null && !m.name().equals(ref.name())) stack.set(Registration.BLUEPRINT_REF.get(), ref.withName(m.name()));
     }
 }
