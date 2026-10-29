@@ -1,16 +1,9 @@
 package dev.designandbuild.client.editor;
 
-import dev.minedraft.lib.client.editor.Snapshot;
-import dev.minedraft.lib.client.editor.EditorColors;
-import dev.minedraft.lib.client.editor.EditorCamera;
 import dev.minedraft.lib.area.Area;
 import dev.minedraft.lib.area.AreaOp;
-import dev.minedraft.lib.area.AreaOps;
-import dev.minedraft.lib.client.ClientAreas;
 import dev.minedraft.lib.client.editor.AreaEditorSession;
 import dev.minedraft.lib.edit.EditRequest;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.network.FriendlyByteBuf;
 import dev.designandbuild.client.library.LibraryEntry;
 import dev.designandbuild.core.BlueprintModel;
 import dev.minedraft.lib.util.Box;
@@ -19,30 +12,17 @@ import dev.designandbuild.core.ModelOps;
 import dev.designandbuild.core.Requests;
 import dev.designandbuild.core.Resolved;
 import dev.designandbuild.core.StructureInstance;
-import dev.designandbuild.net.Msg;
-import dev.designandbuild.net.Net;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**

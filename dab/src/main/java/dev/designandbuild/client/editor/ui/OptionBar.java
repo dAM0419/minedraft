@@ -1,6 +1,5 @@
 package dev.designandbuild.client.editor.ui;
 
-import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.minedraft.lib.client.ui.NumberField;
 import dev.designandbuild.client.ui.TagColors;
 

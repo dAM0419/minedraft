@@ -14,7 +14,6 @@
   "designandbuild.editor.editing_structure": "Editing structure: %s",
   "designandbuild.editor.large_op": "Large operation — click the same spot again to apply",
   "designandbuild.editor.loading_structure": "loading…",
-  "designandbuild.editor.meshing": "Building the view… %s%%",
   "designandbuild.editor.new_structure": "New structure",
   "designandbuild.editor.no_empty": "No empty cell to fill",
   "designandbuild.editor.no_empty_anchor": "No empty cell to fill · set the anchor to 'Outside'",

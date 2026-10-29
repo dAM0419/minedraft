@@ -3,7 +3,6 @@ package dev.designandbuild.server;
 import dev.designandbuild.Registration;
 import dev.designandbuild.block.BlueprintTableBlockEntity;
 import dev.designandbuild.core.BlueprintModel;
-import dev.designandbuild.core.Requests;
 import dev.designandbuild.core.TemplateData;
 import dev.designandbuild.item.BlueprintRef;
 import dev.designandbuild.net.Msg;

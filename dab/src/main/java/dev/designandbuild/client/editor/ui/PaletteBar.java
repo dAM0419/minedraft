@@ -1,6 +1,5 @@
 package dev.designandbuild.client.editor.ui;
 
-import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.EditorScreen;
 import dev.designandbuild.client.editor.EditorSession;

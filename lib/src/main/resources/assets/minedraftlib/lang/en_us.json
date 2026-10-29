@@ -24,6 +24,7 @@
   "minedraftlib.editor.goto_editor": "Click to jump to their cursor",
   "minedraftlib.editor.help": "Shortcuts (H)",
   "minedraftlib.editor.loading": "Loading the area… %s / %s chunks",
+  "minedraftlib.editor.meshing": "Building the view… %s%%",
   "minedraftlib.editor.outlines": "Block outlines (G)",
   "minedraftlib.editor.redo": "Redo (Ctrl+Y)",
   "minedraftlib.editor.rotate_left": "Rotate view left (Q)",

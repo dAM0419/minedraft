@@ -24,6 +24,7 @@
   "minedraftlib.editor.goto_editor": "누르면 이 사람의 커서로 이동",
   "minedraftlib.editor.help": "조작 키 도움말 (H)",
   "minedraftlib.editor.loading": "영역을 불러오는 중… %s / %s 청크",
+  "minedraftlib.editor.meshing": "화면을 만드는 중… %s%%",
   "minedraftlib.editor.outlines": "블록 테두리 (G)",
   "minedraftlib.editor.redo": "다시 하기 (Ctrl+Y)",
   "minedraftlib.editor.rotate_left": "시점 왼쪽으로 회전 (Q)",

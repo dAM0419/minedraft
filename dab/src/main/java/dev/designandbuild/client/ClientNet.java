@@ -3,25 +3,17 @@ package dev.designandbuild.client;
 import dev.minedraft.lib.client.ClientAreas;
 
 import dev.designandbuild.DesignAndBuild;
-import dev.designandbuild.client.editor.EditorScreen;
-import dev.designandbuild.client.editor.EditorSession;
 import dev.designandbuild.client.library.ClientLibrary;
 import dev.designandbuild.client.projection.ProjectionManager;
 import dev.designandbuild.client.table.BlueprintTableScreen;
-import dev.minedraft.lib.util.Box;
-import dev.designandbuild.core.BlueprintModel;
-import dev.designandbuild.core.ModelOps;
 import dev.designandbuild.core.TemplateData;
 import dev.designandbuild.net.Msg;
-import dev.designandbuild.net.Net;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 /** 서버에서 온 메시지 처리. 클라이언트 주 스레드에서 불린다. */

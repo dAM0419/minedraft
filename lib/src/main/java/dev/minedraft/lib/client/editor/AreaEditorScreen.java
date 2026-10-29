@@ -1,6 +1,8 @@
 package dev.minedraft.lib.client.editor;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.minedraft.lib.client.ClientAreas;
 import dev.minedraft.lib.client.LibConfig;
 import dev.minedraft.lib.client.editor.ui.HelpOverlay;
@@ -25,6 +27,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -271,7 +274,40 @@ public abstract class AreaEditorScreen extends Screen {
     }
 
     /** 월드와 그 위의 표시 (조각 아래). */
-    protected abstract void renderViewport(GuiGraphics g, int mx, int my, float pt);
+    protected void renderViewport(GuiGraphics g, int mx, int my, float pt) {
+        ViewportRenderer.render(this, g, mx, my, pt);
+        ViewportRenderer.render2D(this, g, mx, my);
+    }
+
+    /** 3D: 블록 메시 뒤에 직접 그리는 것 (유령 블록, 색 덮개 등). 모델뷰 = 카메라 회전, 좌표는 카메라 목표점 기준으로 옮겨 쓴다. */
+    protected void renderWorldExtras(Matrix4f rot, Matrix4f proj) {
+    }
+
+    /** 3D: 비쳐 보이는 반투명 상자 ({@link ViewportRenderer#fillBox}, 좌표는 목표점 tx·ty·tz 를 뺀 값). */
+    protected void drawOverlayQuads(VertexConsumer quads, Matrix4f m, double tx, double ty, double tz) {
+    }
+
+    /** 3D: 비쳐 보이는 선 ({@link ViewportRenderer#box}·{@link ViewportRenderer#dashedBox}). */
+    protected void drawOverlayLines(VertexConsumer lines, PoseStack ps, double tx, double ty, double tz) {
+    }
+
+    /** 3D: 가려지는 선. */
+    protected void drawSolidLines(VertexConsumer lines, PoseStack ps, double tx, double ty, double tz) {
+    }
+
+    /** 2D: 다른 편집자 이름표 위, 알림 아래. */
+    protected void render2DExtras(GuiGraphics g, int mx, int my) {
+    }
+
+    /** 커서 옆 작은 설명 (빈 목록이면 안 보인다). 첫 줄은 밝게. */
+    protected List<Component> cursorChip() {
+        return List.of();
+    }
+
+    /** 커서 설명 테두리 색 (경고·오류는 모드가 바꾼다). */
+    protected int cursorChipBorder() {
+        return 0xFF4A5563;
+    }
 
     /** 이번 프레임에 이 조각을 숨길지 (예: 블록 선택 중 오른쪽 창). */
     protected boolean partHidden(UiPart<?> p) {
@@ -320,8 +356,8 @@ public abstract class AreaEditorScreen extends Screen {
                 {"H", "minedraftlib.help.toggle"}, {"Esc", "minedraftlib.help.escape"}};
     }
 
-    /** 도움말 표의 아래 끝 (뷰포트 아래쪽에 떠 있는 것이 있으면 그 위). */
-    public int helpBottom() {
+    /** 뷰포트 안에 뜨는 것(도움말 표·알림·커서 칩)의 아래 끝 (뷰포트 아래쪽에 모드 조각이 떠 있으면 그 위). */
+    public int floatingBottom() {
         return vpY + vpH;
     }
 

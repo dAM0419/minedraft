@@ -54,7 +54,7 @@ public final class HelpOverlay {
         int h = maxH + 30;
         // 뷰포트 오른쪽 아래 (층 슬라이더와 팔레트를 피해서)
         int x = Math.max(screen.vpX + 4, screen.vpX + screen.vpW - w - 36);
-        int y = Math.max(screen.vpY + 4, screen.helpBottom() - h - 6);
+        int y = Math.max(screen.vpY + 4, screen.floatingBottom() - h - 6);
         out[0] = x;
         out[1] = y;
         out[2] = w;

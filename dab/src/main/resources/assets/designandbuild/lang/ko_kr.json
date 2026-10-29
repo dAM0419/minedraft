@@ -14,7 +14,6 @@
   "designandbuild.editor.editing_structure": "구조물 편집 중: %s",
   "designandbuild.editor.large_op": "대형 조작 — 같은 자리를 한 번 더 누르면 적용",
   "designandbuild.editor.loading_structure": "불러오는 중…",
-  "designandbuild.editor.meshing": "화면을 만드는 중… %s%%",
   "designandbuild.editor.new_structure": "새 구조물",
   "designandbuild.editor.no_empty": "채울 빈 칸이 없습니다",
   "designandbuild.editor.no_empty_anchor": "채울 빈 칸 없음 · 기준점을 '블록 밖에'로",

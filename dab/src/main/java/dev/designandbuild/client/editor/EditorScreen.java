@@ -1,9 +1,5 @@
 package dev.designandbuild.client.editor;
 
-import dev.minedraft.lib.client.LibConfig;
-
-
-
 import dev.minedraft.lib.client.ClientAreas;
 import dev.minedraft.lib.client.editor.AreaEditorScreen;
 import dev.minedraft.lib.client.editor.AreaEditorSession;
@@ -13,7 +9,6 @@ import dev.minedraft.lib.client.ui.Icons;
 
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.ui.BlockPicker;
-import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.editor.ui.OptionBar;
 import dev.designandbuild.client.editor.ui.OrientationPopup;
 import dev.designandbuild.client.editor.ui.PaletteBar;
@@ -29,7 +24,6 @@ import dev.designandbuild.core.Requests;
 import dev.designandbuild.core.StructureInstance;
 import dev.designandbuild.core.TemplateData;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -132,7 +126,7 @@ public final class EditorScreen extends AreaEditorScreen {
     @Override
     protected void onRemoved() {
         preview.close();
-        ViewportRenderer.release();
+        DesignOverlays.release();
         ClientConfig.save();
     }
 
@@ -179,8 +173,46 @@ public final class EditorScreen extends AreaEditorScreen {
 
     @Override
     protected void renderViewport(GuiGraphics g, int mx, int my, float pt) {
-        ViewportRenderer.render(this, g, mx, my, pt);
-        ViewportRenderer.render2D(this, g, mx, my);
+        preview.update();
+        preview.updatePlacement();
+        super.renderViewport(g, mx, my, pt);
+    }
+
+    @Override
+    protected void renderWorldExtras(org.joml.Matrix4f rot, org.joml.Matrix4f proj) {
+        DesignOverlays.world(this, rot, proj);
+    }
+
+    @Override
+    protected void drawOverlayQuads(com.mojang.blaze3d.vertex.VertexConsumer quads, org.joml.Matrix4f m, double tx, double ty, double tz) {
+        DesignOverlays.quads(this, quads, m, tx, ty, tz);
+    }
+
+    @Override
+    protected void drawOverlayLines(com.mojang.blaze3d.vertex.VertexConsumer lines, com.mojang.blaze3d.vertex.PoseStack ps,
+                                    double tx, double ty, double tz) {
+        DesignOverlays.lines(this, lines, ps, tx, ty, tz);
+    }
+
+    @Override
+    protected void drawSolidLines(com.mojang.blaze3d.vertex.VertexConsumer lines, com.mojang.blaze3d.vertex.PoseStack ps,
+                                  double tx, double ty, double tz) {
+        DesignOverlays.solid(this, lines, ps, tx, ty, tz);
+    }
+
+    @Override
+    protected void render2DExtras(GuiGraphics g, int mx, int my) {
+        DesignOverlays.band(this, g);
+    }
+
+    @Override
+    protected List<Component> cursorChip() {
+        return DesignOverlays.chip(this);
+    }
+
+    @Override
+    protected int cursorChipBorder() {
+        return DesignOverlays.chipBorder(this);
     }
 
     @Override
@@ -212,7 +244,7 @@ public final class EditorScreen extends AreaEditorScreen {
     }
 
     @Override
-    public int helpBottom() {
+    public int floatingBottom() {
         return paletteTop();
     }
 
