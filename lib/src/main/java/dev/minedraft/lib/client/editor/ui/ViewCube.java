@@ -1,9 +1,9 @@
-package dev.designandbuild.client.editor.ui;
+package dev.minedraft.lib.client.editor.ui;
 
 import dev.minedraft.lib.client.editor.ui.UiPart;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.minedraft.lib.client.editor.EditorCamera;
-import dev.designandbuild.client.editor.EditorScreen;
+import dev.minedraft.lib.client.editor.AreaEditorScreen;
 import dev.minedraft.lib.client.ui.Icons;
 import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,7 +24,7 @@ import java.util.List;
  * 칸은 방향 벡터 (sx, sy, sz) ∈ {-1, 0, 1}³ 로 구분한다. 면 하나를 3×3 으로 나눠, 가운데 = 면, 가장자리 = 모서리, 귀퉁이 = 꼭짓점.
  * 시점: 윗면 = 바로 위, 옆면·세로 모서리 = 정면(0°), 위 모서리 = 45°, 위 꼭짓점 = 30° (기본 쿼터뷰와 같은 기울기).
  */
-public final class ViewCube extends DabPart {
+public final class ViewCube extends UiPart<AreaEditorScreen> {
     /** 정육면체 반 변 길이 (화면 픽셀). */
     private static final float HALF = 17.0F;
     /** 모서리·꼭짓점 띠의 두께 (반 변 대비). */
@@ -40,7 +40,7 @@ public final class ViewCube extends DabPart {
     @Nullable
     private int[] hovered;
 
-    public ViewCube(EditorScreen screen) {
+    public ViewCube(AreaEditorScreen screen) {
         super(screen);
     }
 
@@ -127,7 +127,7 @@ public final class ViewCube extends DabPart {
         int by = y + CUBE_H + 4;
         int bx = (int) cx() - (BTN * 3 + 4) / 2;
         int[] icons = {Icons.ROTATE_L, Icons.COMPASS, Icons.ROTATE_R};
-        String[] tips = {"designandbuild.viewcube.rotate_left", "designandbuild.viewcube.home", "designandbuild.viewcube.rotate_right"};
+        String[] tips = {"minedraftlib.viewcube.rotate_left", "minedraftlib.viewcube.home", "minedraftlib.viewcube.rotate_right"};
         for (int i = 0; i < 3; i++) {
             int ix = bx + i * (BTN + 2);
             boolean h = Ui.inside(mx, my, ix, by, BTN, BTN);
@@ -135,8 +135,8 @@ public final class ViewCube extends DabPart {
             if (h) screen.tooltip = List.of(Component.translatable(tips[i]));
         }
         if (hovered != null) {
-            screen.tooltip = List.of(Component.translatable("designandbuild.editor.view_name", nameOf(hovered)),
-                    Component.translatable("designandbuild.viewcube.tip").withStyle(st -> st.withColor(Ui.DIM & 0xFFFFFF)));
+            screen.tooltip = List.of(Component.translatable("minedraftlib.editor.view_name", nameOf(hovered)),
+                    Component.translatable("minedraftlib.viewcube.tip").withStyle(st -> st.withColor(Ui.DIM & 0xFFFFFF)));
         }
     }
 

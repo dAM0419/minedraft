@@ -1,9 +1,9 @@
-package dev.designandbuild.client.editor.ui;
+package dev.minedraft.lib.client.editor.ui;
 
 import dev.minedraft.lib.client.editor.ui.UiPart;
 import dev.minedraft.lib.client.editor.EditorColors;
-import dev.designandbuild.client.editor.EditorScreen;
-import dev.designandbuild.client.editor.EditorSession;
+import dev.minedraft.lib.client.editor.AreaEditorScreen;
+import dev.minedraft.lib.client.editor.AreaEditorSession;
 import dev.minedraft.lib.client.ui.Icons;
 import dev.minedraft.lib.client.ui.Ui;
 import net.minecraft.client.Minecraft;
@@ -23,27 +23,27 @@ import java.util.Map;
 import java.util.UUID;
 
 /** 상단 바: 도면 이름·저장 상태 | 편집 중인 사람 | 나침반·회전·닫기. */
-public final class TopBar extends DabPart {
+public final class TopBar extends UiPart<AreaEditorScreen> {
     private final List<int[]> faceBoxes = new ArrayList<>();
     private final List<UUID> faceIds = new ArrayList<>();
 
-    public TopBar(EditorScreen screen) {
+    public TopBar(AreaEditorScreen screen) {
         super(screen);
     }
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        EditorSession s = s();
+        AreaEditorSession s = s();
         g.fill(x, y, x + w, y + h, Ui.BLUEPRINT);
         for (int gx = x + 8; gx < x + w; gx += 16) g.fill(gx, y, gx + 1, y + h, 0x14FFFFFF);
         g.fill(x, y + h - 1, x + w, y + h, Ui.EDGE);
 
-        // 왼쪽: 도면 이름 + 저장 상태
-        Ui.icon(g, Icons.BLUEPRINT, x + 3, y, Ui.TEXT);
-        String status = s.pending > 0 ? Component.translatable("designandbuild.editor.saving").getString()
-                : Component.translatable("designandbuild.editor.saved").getString();
+        // 왼쪽: 영역 이름 + 저장 상태
+        Ui.icon(g, screen.titleIcon(), x + 3, y, Ui.TEXT);
+        String status = s.pending > 0 ? Component.translatable("minedraftlib.editor.saving").getString()
+                : Component.translatable("minedraftlib.editor.saved").getString();
         int statusColor = s.pending > 0 ? Ui.WARN : Ui.DIM;
-        String name = Ui.clip(s.model.name(), Math.max(40, w / 3 - 80));
+        String name = Ui.clip(s.area.name(), Math.max(40, w / 3 - 80));
         Ui.text(g, name, x + 21, y + 4, Ui.TEXT);
         Ui.text(g, status, x + 25 + Ui.font().width(name), y + 4, statusColor);
 
@@ -64,7 +64,7 @@ public final class TopBar extends DabPart {
             faceBoxes.add(new int[]{fx - 1, y + 2, 12, 12});
             faceIds.add(e.getKey());
             if (Ui.inside(mx, my, fx - 1, y + 2, 12, 12)) {
-                screen.tooltip = List.of(Component.literal(e.getValue()), Component.translatable("designandbuild.editor.goto_editor"));
+                screen.tooltip = List.of(Component.literal(e.getValue()), Component.translatable("minedraftlib.editor.goto_editor"));
             }
             fx += 12;
         }
@@ -73,24 +73,24 @@ public final class TopBar extends DabPart {
         int bx = x + w - 18;
         boolean hClose = Ui.inside(mx, my, bx, y, 16, 16);
         Ui.iconButton(g, bx, y, 16, 16, Icons.CLOSE, false, hClose, true);
-        if (hClose) screen.tooltip = List.of(Component.translatable("designandbuild.editor.close"));
+        if (hClose) screen.tooltip = List.of(Component.translatable("minedraftlib.editor.close"));
         bx -= 18;
         boolean hR = Ui.inside(mx, my, bx, y, 16, 16);
         Ui.iconButton(g, bx, y, 16, 16, Icons.ROTATE_R, false, hR, true);
-        if (hR) screen.tooltip = List.of(Component.translatable("designandbuild.editor.rotate_right"));
+        if (hR) screen.tooltip = List.of(Component.translatable("minedraftlib.editor.rotate_right"));
         bx -= 18;
         boolean hL = Ui.inside(mx, my, bx, y, 16, 16);
         Ui.iconButton(g, bx, y, 16, 16, Icons.ROTATE_L, false, hL, true);
-        if (hL) screen.tooltip = List.of(Component.translatable("designandbuild.editor.rotate_left"));
+        if (hL) screen.tooltip = List.of(Component.translatable("minedraftlib.editor.rotate_left"));
         bx -= 22;
         drawCompass(g, bx + 8, y + 8, s);
         if (Ui.inside(mx, my, bx, y, 16, 16)) {
-            screen.tooltip = List.of(Component.translatable("designandbuild.editor.view_name", s.camera.viewName()));
+            screen.tooltip = List.of(Component.translatable("minedraftlib.editor.view_name", s.camera.viewName()));
         }
     }
 
     /** 나침반: 화면에서 동서남북이 가리키는 방향에 글자를 둔다. */
-    private void drawCompass(GuiGraphics g, int cx, int cy, EditorSession s) {
+    private void drawCompass(GuiGraphics g, int cx, int cy, AreaEditorSession s) {
         g.fill(cx - 7, cy - 7, cx + 8, cy + 8, 0x30000000);
         double tx = s.camera.tx, ty = s.camera.ty, tz = s.camera.tz;
         Vector3f c = s.camera.project(tx, ty, tz);
@@ -108,7 +108,7 @@ public final class TopBar extends DabPart {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        EditorSession s = s();
+        AreaEditorSession s = s();
         int bx = x + w - 18;
         if (Ui.inside(mx, my, bx, y, 16, 16)) {
             screen.onClose();
@@ -127,7 +127,7 @@ public final class TopBar extends DabPart {
         for (int i = 0; i < faceBoxes.size(); i++) {
             int[] b = faceBoxes.get(i);
             if (Ui.inside(mx, my, b[0], b[1], b[2], b[3])) {
-                EditorSession.RemoteCursor c = s.cursors.get(faceIds.get(i));
+                AreaEditorSession.RemoteCursor c = s.cursors.get(faceIds.get(i));
                 if (c != null && c.has()) {
                     screen.focusCamera(BlockPos.getX(c.pos()) + 0.5, BlockPos.getY(c.pos()) + 1, BlockPos.getZ(c.pos()) + 0.5);
                 }

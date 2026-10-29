@@ -7,20 +7,23 @@ import dev.minedraft.lib.client.LibConfig;
 import dev.minedraft.lib.client.ClientAreas;
 import dev.minedraft.lib.client.editor.AreaEditorScreen;
 import dev.minedraft.lib.client.editor.AreaEditorSession;
+import dev.minedraft.lib.client.editor.ui.ToolButton;
 import dev.minedraft.lib.client.editor.ui.UiPart;
+import dev.minedraft.lib.client.ui.Icons;
 
 import dev.designandbuild.client.ClientConfig;
 import dev.designandbuild.client.editor.ui.BlockPicker;
-import dev.designandbuild.client.editor.ui.HelpOverlay;
-import dev.designandbuild.client.editor.ui.LayerSlider;
+import dev.minedraft.lib.client.editor.ui.LayerSlider;
 import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.designandbuild.client.editor.ui.OptionBar;
 import dev.designandbuild.client.editor.ui.OrientationPopup;
 import dev.designandbuild.client.editor.ui.PaletteBar;
 import dev.designandbuild.client.editor.ui.SidePanel;
-import dev.designandbuild.client.editor.ui.ToolBar;
-import dev.designandbuild.client.editor.ui.TopBar;
+import dev.minedraft.lib.client.editor.ui.ToolBar;
+import dev.minedraft.lib.client.editor.ui.TopBar;
+import dev.minedraft.lib.client.editor.ui.ToolButton;
 import dev.minedraft.lib.client.editor.ui.UiPart;
+import dev.minedraft.lib.client.ui.Icons;
 import dev.designandbuild.client.library.ClientLibrary;
 import dev.designandbuild.client.library.LibraryEntry;
 import dev.designandbuild.client.ui.Thumbnails;
@@ -68,7 +71,7 @@ public final class EditorScreen extends AreaEditorScreen {
     public final PaletteBar paletteBar;
     public final SidePanel sidePanel;
     public final LayerSlider layerSlider;
-    public final dev.designandbuild.client.editor.ui.ViewCube viewCube;
+    public final dev.minedraft.lib.client.editor.ui.ViewCube viewCube;
     /** 이번 클릭으로 설치 미리보기 창이 닫혔다 (옵션 바 버튼이 다시 열지 않게). */
     public boolean popupJustClosed;
 
@@ -113,9 +116,16 @@ public final class EditorScreen extends AreaEditorScreen {
         this.paletteBar = new PaletteBar(this);
         this.sidePanel = new SidePanel(this);
         this.layerSlider = new LayerSlider(this);
-        this.viewCube = new dev.designandbuild.client.editor.ui.ViewCube(this);
+        this.viewCube = new dev.minedraft.lib.client.editor.ui.ViewCube(this);
         // 그리는 순서 = 아래에서 위로 (누르기는 반대 순서로 위에 있는 것부터).
         // 뷰포트 위 도구(팔레트·단면 슬라이더·시점 큐브) < 오른쪽 창 < 가장자리 바 (옵션·도구·상단)
+        tools.add(new ToolButton(Icons.SELECT, "V", "designandbuild.tool.select", "designandbuild.tool.select.tip",
+                () -> s.tool == EditorSession.Tool.SELECT, () -> setTool(EditorSession.Tool.SELECT)));
+        tools.add(new ToolButton(Icons.DIRECT, "B", "designandbuild.tool.direct", "designandbuild.tool.direct.tip",
+                () -> s.tool == EditorSession.Tool.DIRECT, () -> setTool(EditorSession.Tool.DIRECT)));
+        tools.add(new ToolButton(Icons.PLACE, "P", "designandbuild.tool.place", "designandbuild.tool.place.tip",
+                () -> s.tool == EditorSession.Tool.PLACE, () -> setTool(EditorSession.Tool.PLACE)));
+        toggles.add(new ToolButton(Icons.TAGS, null, "designandbuild.editor.tag_view", null, () -> tagView, () -> tagView = !tagView));
         parts.add(paletteBar);
         parts.add(layerSlider);
         parts.add(viewCube);
@@ -223,13 +233,26 @@ public final class EditorScreen extends AreaEditorScreen {
     }
 
     @Override
-    protected void renderHelp(GuiGraphics g) {
-        HelpOverlay.render(this, g);
+    public String[][][] helpGroups() {
+        return new String[][][]{
+                {{"designandbuild.help.tools"}, {"V", "designandbuild.tool.select"}, {"B", "designandbuild.tool.direct"},
+                        {"P", "designandbuild.tool.place"}, {"1 2 3 4", "designandbuild.help.ops"}},
+                helpView(new String[]{"T", "designandbuild.help.tag_view"}),
+                {{"designandbuild.help.direct"}, {"minedraftlib.key.lmb", "designandbuild.help.apply"},
+                        {"minedraftlib.key.lmb_drag", "designandbuild.help.paint"},
+                        {"Alt+minedraftlib.key.wheel", "designandbuild.help.size"}, {"Ctrl+minedraftlib.key.wheel", "designandbuild.help.palette"},
+                        {"minedraftlib.key.mmb", "designandbuild.help.eyedropper"},
+                        {"Shift+minedraftlib.key.mmb", "designandbuild.help.eyedropper_palette"}},
+                {{"designandbuild.help.structures"}, {"Alt+minedraftlib.key.lmb", "designandbuild.help.alt_select"},
+                        {"R", "designandbuild.help.rotate"}, {"F", "designandbuild.help.mirror"},
+                        {"PgUp / PgDn", "designandbuild.help.updown"}, {"Del", "designandbuild.select.delete"},
+                        {"minedraftlib.key.rmb", "designandbuild.help.cancel_place"}},
+                helpGeneral()};
     }
 
     @Override
-    protected int[] helpBounds() {
-        return HelpOverlay.bounds(this);
+    public int helpBottom() {
+        return paletteTop();
     }
 
     @Override

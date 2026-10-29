@@ -3,8 +3,11 @@ package dev.minedraft.lib.client.editor;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.minedraft.lib.client.ClientAreas;
 import dev.minedraft.lib.client.LibConfig;
+import dev.minedraft.lib.client.editor.ui.HelpOverlay;
 import dev.minedraft.lib.client.editor.ui.Modal;
+import dev.minedraft.lib.client.editor.ui.ToolButton;
 import dev.minedraft.lib.client.editor.ui.UiPart;
+import dev.minedraft.lib.client.ui.Icons;
 import dev.minedraft.lib.client.ui.Ui;
 import dev.minedraft.lib.edit.EditRequests;
 import dev.minedraft.lib.net.Channel;
@@ -35,6 +38,10 @@ public abstract class AreaEditorScreen extends Screen {
     private final AreaEditorSession base;
     /** 그리는 순서 = 아래에서 위로 (누르기는 반대 순서로 위에 있는 것부터). */
     protected final List<UiPart<?>> parts = new ArrayList<>();
+    /** 왼쪽 툴바 위쪽의 도구 단추 (모드가 생성자에서 채운다). */
+    public final List<ToolButton> tools = new ArrayList<>();
+    /** 왼쪽 툴바 아래쪽, 테두리와 도움말 사이의 보기 단추 (모드가 채운다). */
+    public final List<ToolButton> toggles = new ArrayList<>();
 
     @Nullable
     public Modal<?> modal;
@@ -200,12 +207,50 @@ public abstract class AreaEditorScreen extends Screen {
 
     /** 도움말 (H). */
     protected void renderHelp(GuiGraphics g) {
+        HelpOverlay.render(this, g);
     }
 
     /** 도움말 영역 {x, y, w, h}. 그 안을 누르면 닫힌다. 없으면 null. */
     @Nullable
     protected int[] helpBounds() {
-        return null;
+        return HelpOverlay.bounds(this);
+    }
+
+    /**
+     * 도움말 표의 묶음: 묶음마다 첫 줄은 {제목 키}, 나머지는 {단축키, 설명 키}.
+     * 단축키 글자는 '+' 로 잇고, 점이 든 조각은 문구 키로 번역한다 ("Ctrl+minedraftlib.key.lmb"). "@move" 는 게임 설정의 이동 키.
+     */
+    public String[][][] helpGroups() {
+        return new String[][][]{helpView(), helpGeneral()};
+    }
+
+    /** 보기 묶음. extra 는 테두리(G) 줄 앞에 끼운다. */
+    protected static String[][] helpView(String[]... extra) {
+        List<String[]> rows = new ArrayList<>(List.of(new String[][]{{"minedraftlib.help.view"},
+                {"minedraftlib.key.rmb_drag", "minedraftlib.help.pan"}, {"@move", "minedraftlib.help.pan_keys"},
+                {"minedraftlib.key.wheel", "minedraftlib.help.zoom"}, {"Q / E", "minedraftlib.help.rotate_view"},
+                {"L", "minedraftlib.layer.toggle"}, {"Shift+L", "minedraftlib.help.cut_axis"},
+                {"Ctrl+minedraftlib.key.lmb", "minedraftlib.help.cut_at"}, {"Shift+minedraftlib.key.wheel", "minedraftlib.help.layer_move"},
+                {"X", "minedraftlib.layer.bubble"}}));
+        rows.addAll(List.of(extra));
+        rows.add(new String[]{"G", "minedraftlib.help.outlines"});
+        rows.add(new String[]{"Tab", "minedraftlib.help.panel"});
+        return rows.toArray(new String[0][]);
+    }
+
+    protected static String[][] helpGeneral() {
+        return new String[][]{{"minedraftlib.help.general"}, {"Ctrl+Z", "minedraftlib.undo"}, {"Ctrl+Y", "minedraftlib.redo"},
+                {"H", "minedraftlib.help.toggle"}, {"Esc", "minedraftlib.help.escape"}};
+    }
+
+    /** 도움말 표의 아래 끝 (뷰포트 아래쪽에 떠 있는 것이 있으면 그 위). */
+    public int helpBottom() {
+        return vpY + vpH;
+    }
+
+    /** 상단 바 왼쪽, 영역 이름 앞의 아이콘. */
+    public int titleIcon() {
+        return Icons.BLUEPRINT;
     }
 
     /** 조각 위 · 창(모달) 아래에 그릴 것 (떠 있는 작은 창 등). */
