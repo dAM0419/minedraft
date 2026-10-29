@@ -1,0 +1,25 @@
+plugins {
+    id 'net.neoforged.moddev' version '2.0.42-beta' apply false
+}
+
+// 하위 프로젝트(lib, dab …)가 각자 모드 하나씩 만든다. 공통 설정은 여기서.
+subprojects {
+    apply plugin: 'java-library'
+    apply plugin: 'idea'
+
+    java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven {
+            name = 'JEI'
+            url = 'https://maven.blamejared.com/'
+            content { includeGroup 'mezz.jei' }
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}

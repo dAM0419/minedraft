@@ -1,0 +1,56 @@
+{
+  "values": [
+    "minecraft:mycelium",
+    "minecraft:podzol",
+    "minecraft:ice",
+    "minecraft:packed_ice",
+    "minecraft:blue_ice",
+    "minecraft:glass",
+    "minecraft:glass_pane",
+    "minecraft:tinted_glass",
+    "minecraft:bookshelf",
+    "minecraft:chiseled_bookshelf",
+    "minecraft:glowstone",
+    "minecraft:sea_lantern",
+    "minecraft:melon",
+    "minecraft:clay",
+    "minecraft:snow_block",
+    "minecraft:ender_chest",
+    "minecraft:brown_mushroom_block",
+    "minecraft:red_mushroom_block",
+    "minecraft:mushroom_stem",
+    "minecraft:turtle_egg",
+    "minecraft:sniffer_egg",
+    "minecraft:campfire",
+    "minecraft:soul_campfire",
+    "minecraft:bee_nest",
+    "minecraft:amethyst_cluster",
+    "minecraft:sculk",
+    "minecraft:sculk_vein",
+    "minecraft:sculk_catalyst",
+    "minecraft:sculk_sensor",
+    "minecraft:calibrated_sculk_sensor",
+    "minecraft:sculk_shrieker",
+    "minecraft:crimson_nylium",
+    "minecraft:warped_nylium",
+    "minecraft:gilded_blackstone",
+    "minecraft:large_amethyst_bud",
+    "minecraft:medium_amethyst_bud",
+    "minecraft:small_amethyst_bud",
+    "minecraft:budding_amethyst",
+    {
+      "id": "#c:glass_blocks",
+      "required": false
+    },
+    {
+      "id": "#c:glass_panes",
+      "required": false
+    },
+    {
+      "id": "#c:ores",
+      "required": false
+    },
+    "#minecraft:coral_blocks",
+    "#minecraft:leaves"
+  ]
+}

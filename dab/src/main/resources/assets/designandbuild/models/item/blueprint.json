@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "designandbuild:item/blueprint"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "designandbuild:bound": 1
+      },
+      "model": "designandbuild:item/blueprint_bound"
+    }
+  ]
+}

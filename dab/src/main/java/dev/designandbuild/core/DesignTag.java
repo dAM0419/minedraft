@@ -1,0 +1,19 @@
+package dev.designandbuild.core;
+
+/**
+ * 설계 칸의 목적 태그.
+ * NONE 은 "태그 없음"으로, 지형 층에서는 공기(철거)에만 쓰인다.
+ */
+public enum DesignTag {
+    NONE, FLOOR, PATH, STRUCTURE;
+
+    private static final DesignTag[] VALUES = values();
+
+    public static DesignTag byId(int id) {
+        return id >= 0 && id < VALUES.length ? VALUES[id] : NONE;
+    }
+
+    public String key() {
+        return name().toLowerCase(java.util.Locale.ROOT);
+    }
+}
