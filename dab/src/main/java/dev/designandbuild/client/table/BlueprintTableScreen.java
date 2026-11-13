@@ -48,6 +48,8 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
     private boolean confirming;
     /** 셰이더 팩이 켜진 채 편집창을 열려고 함: 경고를 보고 확인해야 들어간다. */
     private boolean shaderConfirm;
+    /** 셰이더 경고를 확인하면 새 설계를 시작한다 (아니면 기존 설계 편집창 열기). */
+    private boolean shaderThenStart;
 
     public BlueprintTableScreen(BlueprintTableMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -338,7 +340,7 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
         int[] b = shaderButtons();
         if (Ui.inside(mx, my, b[2], b[6], b[3], 16)) {
             shaderConfirm = false;
-            openEditor();
+            shaderAccepted();
         } else if (Ui.inside(mx, my, b[4], b[6], b[5], 16) || !Ui.inside(mx, my, b[0], b[1], SW, SH)) {
             shaderConfirm = false;
         }
@@ -366,11 +368,27 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
         int bY = y + CH - 24;
         int okX = x + CW - 10 - bw1, cancelX = okX - 6 - bw2;
         if (Ui.inside(mx, my, okX, bY, bw1, 16)) {
-            startDesign();
+            requestStartDesign();
         } else if (Ui.inside(mx, my, cancelX, bY, bw2, 16) || !Ui.inside(mx, my, x, y, CW, CH)) {
             confirming = false;
         }
         return true;
+    }
+
+    /** 새 설계 시작 확인: 셰이더 팩이 켜져 있으면 처음 열 때도 경고를 먼저 보여 준다. */
+    private void requestStartDesign() {
+        if (dev.designandbuild.client.projection.ProjectionRenderer.shaderPackInUse()) {
+            confirming = false;
+            shaderConfirm = true;
+            shaderThenStart = true;
+        } else {
+            startDesign();
+        }
+    }
+
+    private void shaderAccepted() {
+        if (shaderThenStart) startDesign();
+        else openEditor();
     }
 
     private void startDesign() {
@@ -423,6 +441,7 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
                 // 셰이더 팩이 켜져 있으면 그래픽 오류 경고를 먼저 보여 주고, 확인해야 들어간다
                 if (dev.designandbuild.client.projection.ProjectionRenderer.shaderPackInUse()) {
                     shaderConfirm = true;
+                    shaderThenStart = false;
                 } else {
                     openEditor();
                 }
@@ -441,14 +460,14 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
     public boolean keyPressed(int key, int scan, int mods) {
         if (confirming) {
             if (key == GLFW.GLFW_KEY_ESCAPE) confirming = false;
-            else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) startDesign();
+            else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) requestStartDesign();
             return true;
         }
         if (shaderConfirm) {
             if (key == GLFW.GLFW_KEY_ESCAPE) shaderConfirm = false;
             else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
                 shaderConfirm = false;
-                openEditor();
+                shaderAccepted();
             }
             return true;
         }
