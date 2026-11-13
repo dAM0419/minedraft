@@ -144,8 +144,11 @@ public final class EditorSession extends AreaEditorSession {
 
     /** 구조물 편집 중이면 그 구조물 ID (나머지를 숨긴다), 아니면 0. */
     public int isolated() {
-        return selected != 0 && tool == Tool.DIRECT && model.structure(selected) != null ? selected : 0;
+        return selected != 0 && tool == Tool.DIRECT && !suspendIsolation && model.structure(selected) != null ? selected : 0;
     }
+
+    /** 공간 지정 도구로 구조물에 넣을 블록을 고르는 동안은 구조물만 보이게 하지 않는다 (편집창이 매 프레임 정한다). */
+    public boolean suspendIsolation;
 
 
     private int lastIsolated;

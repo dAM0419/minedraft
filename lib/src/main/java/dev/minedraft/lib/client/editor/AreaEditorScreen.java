@@ -228,6 +228,20 @@ public abstract class AreaEditorScreen extends Screen {
         }
     }
 
+    /** 공간 지정 도구가 이 칸에 이 태그를 칠할 수 있는가 (미리보기·대상 고르기). 기본은 묶음 규칙. */
+    protected boolean tagAllows(dev.minedraft.lib.space.TagGroup group, long pos, @Nullable dev.minedraft.lib.space.SpaceTag tag) {
+        return group.policy().allows(base.area, pos, tag);
+    }
+
+    /**
+     * 공간 지정 도구가 칸들을 칠하려 한다. 모드가 이 태그를 자기 방식으로 처리하면 true (Lib 칠하기 요청을 보내지 않는다).
+     * undoGroup 은 끌기 한 번을 되돌리기 한 번으로 묶는 번호.
+     */
+    protected boolean paintTags(dev.minedraft.lib.space.TagGroup group, @Nullable dev.minedraft.lib.space.SpaceTag tag, long[] pos,
+                                int undoGroup) {
+        return false;
+    }
+
     /** 공간 지정 도구 켜기·끄기. 모드가 자기 도구로 바꿀 때 false 로 부른다. */
     public void setTagTool(boolean on) {
         tagTool.setActive(on);

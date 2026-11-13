@@ -26,13 +26,14 @@ public final class DabTags {
     public static final List<SpaceTag> ALL = List.of(FLOOR, PATH, STRUCTURE);
 
     /**
-     * 공간 지정 도구로는 지형 층 블록의 바닥/길만 바꾼다. 구조물 태그는 직접조작 도구의 구조물 층으로 정해지고,
+     * 공간 지정 도구: 바닥/길은 설계한 지형 블록의 태그를 바꾼다 (서버가 이 규칙으로 거른다).
+     * 구조물은 이미 있는 블록(월드·설계)을 구조물에 넣는 것이라 편집창이 구조물 칸 요청으로 바꿔 보낸다 (Lib 칠하기로는 오지 않는다).
      * 지형 블록에는 늘 바닥이나 길 중 하나가 붙으므로 지우기는 없다.
      */
     public static final TagPolicy POLICY = new TagPolicy() {
         @Override
         public List<SpaceTag> paintable(Area area, dev.minedraft.lib.space.TagGroup group) {
-            return List.of(FLOOR, PATH);
+            return List.of(FLOOR, PATH, STRUCTURE);
         }
 
         @Override

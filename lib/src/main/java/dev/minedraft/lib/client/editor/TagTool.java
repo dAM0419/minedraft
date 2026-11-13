@@ -137,7 +137,7 @@ public final class TagTool {
             for (int y = b.minY(); y <= b.maxY(); y++)
                 for (int z = b.minZ(); z <= b.maxZ(); z++) {
                     long p = BlockPos.asLong(x, y, z);
-                    if (!a.isInside(p) || l.tagAt(p, gid) == t || !pol.allows(a, p, t)) continue;
+                    if (!a.isInside(p) || l.tagAt(p, gid) == t || !screen.tagAllows(g, p, t)) continue;
                     out.add(p);
                 }
         return out.toLongArray();
@@ -200,7 +200,10 @@ public final class TagTool {
         if (send.isEmpty()) return;
         TagGroup g = currentGroup();
         if (g == null) return;
-        screen.session().send(new SpaceTagEdits.Paint(group, send.toLongArray(), g.id(), current()));
+        long[] cells = send.toLongArray();
+        // 모드가 직접 처리하는 태그 (DaB 구조물: 칸을 구조물에 넣는다)
+        if (screen.paintTags(g, current(), cells, group)) return;
+        screen.session().send(new SpaceTagEdits.Paint(group, cells, g.id(), current()));
     }
 
     // ------------------------------------------------------------------

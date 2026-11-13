@@ -164,7 +164,43 @@ public final class EditorScreen extends AreaEditorScreen {
 
     @Override
     protected void beforeFrame() {
+        s.suspendIsolation = tagTool.active && !immersive.active;
         s.checkIsolationChanged();
+    }
+
+    // ------------------------------------------------------------------
+    // 공간 지정: 구조물 태그 = 이미 있는 블록을 구조물에 넣기
+    // ------------------------------------------------------------------
+
+    @Override
+    protected boolean tagAllows(dev.minedraft.lib.space.TagGroup group, long pos, @Nullable dev.minedraft.lib.space.SpaceTag tag) {
+        if (tag != dev.designandbuild.core.DabTags.STRUCTURE) return super.tagAllows(group, pos, tag);
+        int x = BlockPos.getX(pos), y = BlockPos.getY(pos), z = BlockPos.getZ(pos);
+        BlockState st = s.blockAt(x, y, z, false);
+        if (st.isAir()) return false;
+        dev.designandbuild.core.Resolved r = s.model.resolved(pos);
+        // 다른 구조물 칸은 빼앗지 않고, 이미 넣을 구조물의 칸이면 건너뛴다
+        return r == null || r.owner() == 0;
+    }
+
+    /**
+     * 구조물 태그: 붓 안의 블록(설계가 있으면 설계, 없으면 월드 그대로)을 선택한 구조물에 넣는다.
+     * 선택한 구조물이 없으면 새 구조물을 만들어 넣고, 만든 구조물이 선택된다 (그대로 몰입형 설계로 고칠 수 있다).
+     */
+    @Override
+    protected boolean paintTags(dev.minedraft.lib.space.TagGroup group, @Nullable dev.minedraft.lib.space.SpaceTag tag, long[] pos,
+                                int undoGroup) {
+        if (tag != dev.designandbuild.core.DabTags.STRUCTURE) return false;
+        BlockState[] states = new BlockState[pos.length];
+        for (int i = 0; i < pos.length; i++) states[i] = s.blockAt(BlockPos.getX(pos[i]), BlockPos.getY(pos[i]), BlockPos.getZ(pos[i]), false);
+        if (s.selected != 0 && s.model.structure(s.selected) != null) {
+            s.send(new Requests.StructCells(undoGroup, s.selected, "", pos, states));
+        } else if (s.isAwaitingCreate()) {
+            s.queueForCreated(undoGroup, pos, states);
+        } else {
+            s.sendCreating(new Requests.StructCells(undoGroup, 0, s.newStructureName(), pos, states));
+        }
+        return true;
     }
 
     @Override
