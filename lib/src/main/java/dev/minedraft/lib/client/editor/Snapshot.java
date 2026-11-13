@@ -1,7 +1,9 @@
 package dev.minedraft.lib.client.editor;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
@@ -49,6 +51,8 @@ public final class Snapshot {
         final byte[][] biomes;
         /** 칸마다 가장 높은 공기 아닌 블록의 y (없으면 최저 높이 - 1). */
         final int[] heights = new int[256];
+        /** 블록 엔티티 동기화 데이터 (칸 → update tag). */
+        final Long2ObjectOpenHashMap<CompoundTag> blockEntities = new Long2ObjectOpenHashMap<>();
 
         ChunkData(int minSection, Section[] sections, Holder<Biome>[] biomePalette, byte[][] biomes) {
             this.minSection = minSection;
@@ -113,6 +117,12 @@ public final class Snapshot {
             biomes[i] = b;
         }
         ChunkData data = new ChunkData(minSection, sections, biomePalette, biomes);
+        int nbe = buf.readVarInt();
+        for (int i = 0; i < nbe; i++) {
+            long p = buf.readLong();
+            CompoundTag t = buf.readNbt();
+            if (t != null) data.blockEntities.put(p, t);
+        }
         int minY = minSection << 4;
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
@@ -144,6 +154,13 @@ public final class Snapshot {
         lastKey = key;
         lastChunk = c;
         return c;
+    }
+
+    /** 월드 사본의 블록 엔티티 동기화 데이터 (없으면 null). */
+    @Nullable
+    public CompoundTag blockEntityTag(int x, int y, int z) {
+        ChunkData c = chunk(x, z);
+        return c == null ? null : c.blockEntities.get(BlockPos.asLong(x, y, z));
     }
 
     public BlockState get(int x, int y, int z) {

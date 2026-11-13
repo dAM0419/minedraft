@@ -1,5 +1,6 @@
 package dev.minedraft.lib.client.editor;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import dev.minedraft.lib.client.LibConfig;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -406,35 +407,84 @@ public final class EditorRenderer implements AutoCloseable {
         meshes.addAll(m2);
     }
 
-    /** 상자·표지판 등 블록 엔티티 모양 블록은 아이템 모델로 그때그때 그린다. */
+    /** 한 번에 그리는 블록 엔티티 렌더러 수 상한 (넘으면 나머지는 모델만). */
+    private static final int MAX_BLOCK_ENTITIES = 4096;
+    /** 렌더러가 오류를 낸 칸 (다시 그리지 않는다). */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet berFailed = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+
+    /**
+     * 블록 엔티티 렌더러 (Create 축·톱니·증기 엔진, 상자, 표지판 …) 와, 렌더러가 없는 블록 엔티티 모양 블록의 아이템 모델.
+     * 패스마다 그 패스에 해당하는 칸만 (단면 아래 = 잘리지 않은 칸, 위 = 잘린 칸).
+     */
     private void drawDynamic(List<BlockMesher.Mesh> meshes, Pass pass) {
-        int count = 0;
-        for (BlockMesher.Mesh m : meshes) count += m.dynamic.length;
-        if (count == 0 || count > 3000) return;
         Minecraft mc = Minecraft.getInstance();
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
+        var dispatcher = mc.getBlockEntityRenderDispatcher();
+        float pt = mc.getTimer().getGameTimeDeltaPartialTick(false);
         PoseStack pose = new PoseStack();
-        for (BlockMesher.Mesh m : meshes) {
-            for (long p : m.dynamic) {
-                int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
-                if (pass == Pass.LOWER && s.cutActive && s.isCut(x, y, z)) continue;
-                BlockState state = s.visibleAt(x, y, z, false);
-                pose.pushPose();
-                pose.translate(x - s.camera.tx, y - s.camera.ty, z - s.camera.tz);
-                if (state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-                    pose.translate(0.5, 0.5, 0.5);
-                    pose.mulPose(Axis.YP.rotationDegrees(-state.getValue(BlockStateProperties.HORIZONTAL_FACING).toYRot()));
-                    pose.translate(-0.5, -0.5, -0.5);
-                }
+        com.mojang.blaze3d.platform.Lighting.setupLevel();
+        // 1) 블록 엔티티 렌더러
+        LongOpenHashSet drawn = new LongOpenHashSet();
+        int[] n = {0};
+        s.blockEntities.forEach(be -> {
+            if (n[0] >= MAX_BLOCK_ENTITIES) return;
+            BlockPos bp = be.getBlockPos();
+            long key = bp.asLong();
+            if (berFailed.contains(key)) return;
+            int x = bp.getX(), y = bp.getY(), z = bp.getZ();
+            boolean cut = s.cutActive && s.isCut(x, y, z);
+            if ((pass == Pass.LOWER && cut) || (pass == Pass.UPPER && !cut)) return;
+            if (s.visibleAt(x, y, z, false).getBlock() != be.getBlockState().getBlock()) return;
+            net.minecraft.client.renderer.blockentity.BlockEntityRenderer<net.minecraft.world.level.block.entity.BlockEntity> r =
+                    dispatcher.getRenderer(be);
+            if (r == null) return;
+            pose.pushPose();
+            pose.translate(x - s.camera.tx, y - s.camera.ty, z - s.camera.tz);
+            try {
+                r.render(be, pt, pose, buffers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+                drawn.add(key);
+                n[0]++;
+            } catch (Throwable t) {
+                // 이 월드 밖에서 그릴 수 없는 렌더러: 이 칸은 다시 그리지 않는다 (모델·아이템 모양으로만)
+                berFailed.add(key);
                 try {
-                    mc.getBlockRenderer().renderSingleBlock(state, pose, buffers, LightTexture.FULL_BRIGHT,
-                            OverlayTexture.NO_OVERLAY, ModelData.EMPTY, null);
-                } catch (Exception ignored) {
+                    buffers.endBatch();
+                } catch (Throwable ignored) {
                 }
-                pose.popPose();
+            }
+            pose.popPose();
+        });
+        // 2) 렌더러가 없는 블록 엔티티 모양 블록: 아이템 모델
+        int count = 0;
+        for (BlockMesher.Mesh m : meshes) count += m.dynamic.length;
+        if (count > 0 && count <= 3000) {
+            for (BlockMesher.Mesh m : meshes) {
+                for (long p : m.dynamic) {
+                    if (drawn.contains(p)) continue;
+                    int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
+                    if (pass == Pass.LOWER && s.cutActive && s.isCut(x, y, z)) continue;
+                    BlockState state = s.visibleAt(x, y, z, false);
+                    pose.pushPose();
+                    pose.translate(x - s.camera.tx, y - s.camera.ty, z - s.camera.tz);
+                    if (state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
+                        pose.translate(0.5, 0.5, 0.5);
+                        pose.mulPose(Axis.YP.rotationDegrees(-state.getValue(BlockStateProperties.HORIZONTAL_FACING).toYRot()));
+                        pose.translate(-0.5, -0.5, -0.5);
+                    }
+                    try {
+                        mc.getBlockRenderer().renderSingleBlock(state, pose, buffers, LightTexture.FULL_BRIGHT,
+                                OverlayTexture.NO_OVERLAY, ModelData.EMPTY, null);
+                    } catch (Exception ignored) {
+                    }
+                    pose.popPose();
+                }
             }
         }
-        buffers.endBatch();
+        try {
+            buffers.endBatch();
+        } catch (Throwable ignored) {
+            // 렌더러가 덜 쓴 정점이 남았을 때: 이번 프레임만 버린다
+        }
         RenderSystem.enableDepthTest();
     }
 

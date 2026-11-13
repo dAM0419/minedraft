@@ -155,6 +155,9 @@ public abstract class AreaEditorSession implements ClientEditor {
 
     public final Snapshot snapshot = new Snapshot();
 
+    /** 편집창 블록 엔티티 (모델 데이터·블록 엔티티 렌더러용). */
+    public final EditorBlockEntities blockEntities = new EditorBlockEntities(this);
+
     public final EditorCamera camera = new EditorCamera();
 
     public final EditorWorld world = new EditorWorld(this, false);
@@ -220,6 +223,7 @@ public abstract class AreaEditorSession implements ClientEditor {
 
 
     private final java.util.function.LongConsumer blockListener = pos -> {
+        blockEntities.invalidate(pos);
         if (renderer != null) renderer.markBlock(pos);
     };
 
@@ -232,6 +236,7 @@ public abstract class AreaEditorSession implements ClientEditor {
     @Override
     public void dispose() {
         area.removeListener(blockListener);
+        blockEntities.clear();
         if (renderer != null) {
             renderer.close();
             renderer = null;
@@ -608,6 +613,7 @@ public abstract class AreaEditorSession implements ClientEditor {
 
 
     public void onSnapshotChunk(long chunk) {
+        blockEntities.invalidateChunk(chunk);
         if (ready && renderer != null) {
             computeRenderMinY();
             renderer.markChunkArea(chunk);
@@ -769,7 +775,10 @@ public abstract class AreaEditorSession implements ClientEditor {
         for (AreaOp op : ops) {
             if (op instanceof AreaOps.ChunkAdd || op instanceof AreaOps.ChunkRemove) {
                 long c = op instanceof AreaOps.ChunkAdd a ? a.chunk() : ((AreaOps.ChunkRemove) op).chunk();
-                if (op instanceof AreaOps.ChunkRemove) snapshot.remove(c);
+                if (op instanceof AreaOps.ChunkRemove) {
+                    snapshot.remove(c);
+                    blockEntities.invalidateChunk(c);
+                }
                 if (renderer != null) renderer.markChunkArea(c);
             }
             for (long p : changedPositions(op)) lowest = Math.min(lowest, BlockPos.getY(p));

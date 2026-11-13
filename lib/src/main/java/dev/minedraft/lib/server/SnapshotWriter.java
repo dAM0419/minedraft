@@ -1,5 +1,9 @@
 package dev.minedraft.lib.server;
 
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.BlockPos;
+import java.util.Map;
 import dev.minedraft.lib.net.Channel;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -24,10 +28,14 @@ import java.util.UUID;
  * [도면 UUID][청크 long][최소 섹션][섹션 수]
  * [생물군계 이름 팔레트]
  * 섹션마다: [0 = 공기만] 또는 [1][블록 팔레트][4096칸 번호 (팔레트 크기에 따라 0/1/2바이트)][생물군계 64칸]
+ * [블록 엔티티 수][(칸, update tag) …]
  * </pre>
  */
 public final class SnapshotWriter {
     private SnapshotWriter() {}
+
+    /** 청크당 보내는 블록 엔티티 수와 하나의 데이터 크기 상한 (넘으면 빈 데이터 = 기본 모습). */
+    private static final int MAX_BE_PER_CHUNK = 4096, MAX_BE_BYTES = 32 * 1024;
 
     public static byte[] encode(ServerLevel level, UUID blueprint, long chunkLong) {
         int cx = ChunkPos.getX(chunkLong), cz = ChunkPos.getZ(chunkLong);
@@ -103,6 +111,23 @@ public final class SnapshotWriter {
                     for (short v : data) buf.writeByte(v);
                 }
                 buf.writeBytes(biomeData[i]);
+            }
+            // 블록 엔티티: 클라이언트 동기화 데이터(update tag) 만 (보관함 내용 같은 저장 데이터는 보내지 않는다)
+            List<Map.Entry<BlockPos, CompoundTag>> bes = new ArrayList<>();
+            for (Map.Entry<BlockPos, BlockEntity> e : chunk.getBlockEntities().entrySet()) {
+                try {
+                    CompoundTag t = e.getValue().getUpdateTag(level.registryAccess());
+                    if (t == null || t.sizeInBytes() > MAX_BE_BYTES) t = new CompoundTag();
+                    bes.add(Map.entry(e.getKey(), t));
+                } catch (Throwable ignored) {
+                    // 모드 블록 엔티티 하나가 실패해도 나머지는 보낸다
+                }
+                if (bes.size() >= MAX_BE_PER_CHUNK) break;
+            }
+            buf.writeVarInt(bes.size());
+            for (Map.Entry<BlockPos, CompoundTag> e : bes) {
+                buf.writeLong(e.getKey().asLong());
+                buf.writeNbt(e.getValue());
             }
         });
     }

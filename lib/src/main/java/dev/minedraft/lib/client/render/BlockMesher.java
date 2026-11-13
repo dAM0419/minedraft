@@ -116,6 +116,8 @@ public final class BlockMesher {
                                 (pos.getZ() & ~15) - oz, alpha);
                         dispatcher.renderLiquid(pos, level, fluidWrapper, state, fluid);
                     }
+                    // 블록 엔티티가 있는 블록: 여기서 한 번 찾아 두면 편집창이 블록 엔티티를 만들어 렌더러로 그린다
+                    if (state.hasBlockEntity()) level.getBlockEntity(pos);
                     RenderShape shape = state.getRenderShape();
                     if (shape == RenderShape.ENTITYBLOCK_ANIMATED) {
                         dynamic.add(pos.asLong());

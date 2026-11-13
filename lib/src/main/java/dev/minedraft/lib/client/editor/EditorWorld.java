@@ -43,7 +43,20 @@ public final class EditorWorld implements BlockAndTintGetter {
     @Nullable
     @Override
     public BlockEntity getBlockEntity(BlockPos pos) {
-        return null;
+        // 보이는 칸만 (단면에 잘린 칸은 공기로 보이므로 블록 엔티티도 없다)
+        return getBlockState(pos).hasBlockEntity() ? session.blockEntities.get(pos) : null;
+    }
+
+    /** 블록 엔티티가 주는 모델 데이터 (연결 텍스처, 보일러 외장 등). */
+    @Override
+    public net.neoforged.neoforge.client.model.data.ModelData getModelData(BlockPos pos) {
+        BlockEntity be = getBlockEntity(pos);
+        if (be == null) return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        try {
+            return be.getModelData();
+        } catch (Throwable t) {
+            return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        }
     }
 
     @Override
