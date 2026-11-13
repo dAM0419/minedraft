@@ -47,9 +47,6 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
     private int[] mapColors;
     private boolean confirming;
     /** 셰이더 팩이 켜진 채 편집창을 열려고 함: 경고를 보고 확인해야 들어간다. */
-    private boolean shaderConfirm;
-    /** 셰이더 경고를 확인하면 새 설계를 시작한다 (아니면 기존 설계 편집창 열기). */
-    private boolean shaderThenStart;
 
     public BlueprintTableScreen(BlueprintTableMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -191,8 +188,6 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
         renderButton(g, mx, my);
         if (confirming) {
             renderConfirm(g, mx, my);
-        } else if (shaderConfirm) {
-            renderShaderConfirm(g, mx, my);
         } else {
             renderTooltip(g, mx, my);
         }
@@ -300,53 +295,6 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
         g.pose().popPose();
     }
 
-    // ------------------------------------------------------------------
-    // 셰이더 팩 경고
-    // ------------------------------------------------------------------
-
-    private static final int SW = 228, SH = 104;
-
-    private int[] shaderButtons() {
-        int x = (width - SW) / 2, y = (height - SH) / 2;
-        Component ok = Component.translatable("designandbuild.shader.open_anyway");
-        Component cancel = Component.translatable("designandbuild.dialog.cancel");
-        int bw1 = font.width(ok) + 20, bw2 = font.width(cancel) + 20;
-        int bY = y + SH - 24;
-        int okX = x + SW - 10 - bw1, cancelX = okX - 6 - bw2;
-        return new int[]{x, y, okX, bw1, cancelX, bw2, bY};
-    }
-
-    private void renderShaderConfirm(GuiGraphics g, int mx, int my) {
-        int[] b = shaderButtons();
-        int x = b[0], y = b[1];
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 400);
-        g.fill(0, 0, width, height, 0x90000000);
-        g.fill(x, y, x + SW, y + SH, BG);
-        Ui.border(g, x, y, SW, SH, 0xFFE0A030);
-        Ui.icon(g, Icons.WARN, x + 8, y + 6, 0xFFE0A030);
-        g.drawString(font, Component.translatable("designandbuild.shader.title"), x + 28, y + 10, 0xFFFFFFFF, false);
-        int ty = y + 28;
-        for (var line : font.split(Component.translatable("designandbuild.msg.shader_warning"), SW - 20)) {
-            g.drawString(font, line, x + 10, ty, 0xFFE8F0FF, false);
-            ty += 10;
-        }
-        confirmButton(g, b[2], b[6], b[3], Component.translatable("designandbuild.shader.open_anyway"), true, mx, my);
-        confirmButton(g, b[4], b[6], b[5], Component.translatable("designandbuild.dialog.cancel"), false, mx, my);
-        g.pose().popPose();
-    }
-
-    private boolean shaderConfirmClick(double mx, double my) {
-        int[] b = shaderButtons();
-        if (Ui.inside(mx, my, b[2], b[6], b[3], 16)) {
-            shaderConfirm = false;
-            shaderAccepted();
-        } else if (Ui.inside(mx, my, b[4], b[6], b[5], 16) || !Ui.inside(mx, my, b[0], b[1], SW, SH)) {
-            shaderConfirm = false;
-        }
-        return true;
-    }
-
     private void openEditor() {
         BlockPos pos = menu.tablePos();
         Net.toServer(Msg.C_OPEN_EDITOR, b -> b.writeBlockPos(pos));
@@ -368,27 +316,11 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
         int bY = y + CH - 24;
         int okX = x + CW - 10 - bw1, cancelX = okX - 6 - bw2;
         if (Ui.inside(mx, my, okX, bY, bw1, 16)) {
-            requestStartDesign();
+            startDesign();
         } else if (Ui.inside(mx, my, cancelX, bY, bw2, 16) || !Ui.inside(mx, my, x, y, CW, CH)) {
             confirming = false;
         }
         return true;
-    }
-
-    /** 새 설계 시작 확인: 셰이더 팩이 켜져 있으면 처음 열 때도 경고를 먼저 보여 준다. */
-    private void requestStartDesign() {
-        if (dev.designandbuild.client.projection.ProjectionRenderer.shaderPackInUse()) {
-            confirming = false;
-            shaderConfirm = true;
-            shaderThenStart = true;
-        } else {
-            startDesign();
-        }
-    }
-
-    private void shaderAccepted() {
-        if (shaderThenStart) startDesign();
-        else openEditor();
     }
 
     private void startDesign() {
@@ -421,7 +353,6 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (confirming) return confirmClick(mx, my);
-        if (shaderConfirm) return shaderConfirmClick(mx, my);
         boolean wasFocused = name.isFocused();
         if (name.visible && name.isMouseOver(mx, my)) {
             name.setFocused(true);
@@ -438,13 +369,8 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
         int st = state();
         if (Ui.inside(mx, my, leftPos + BTN_X, topPos + BTN_Y, BTN_W, BTN_H)) {
             if (st == ClientNet.TableInfo.BOUND) {
-                // 셰이더 팩이 켜져 있으면 그래픽 오류 경고를 먼저 보여 주고, 확인해야 들어간다
-                if (dev.designandbuild.client.projection.ProjectionRenderer.shaderPackInUse()) {
-                    shaderConfirm = true;
-                    shaderThenStart = false;
-                } else {
-                    openEditor();
-                }
+                // 셰이더 팩 경고는 편집창(Minedraft Lib)이 연 뒤에 띄운다
+                openEditor();
                 return true;
             }
             if (st == ClientNet.TableInfo.EMPTY_BLUEPRINT) {
@@ -460,15 +386,7 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
     public boolean keyPressed(int key, int scan, int mods) {
         if (confirming) {
             if (key == GLFW.GLFW_KEY_ESCAPE) confirming = false;
-            else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) requestStartDesign();
-            return true;
-        }
-        if (shaderConfirm) {
-            if (key == GLFW.GLFW_KEY_ESCAPE) shaderConfirm = false;
-            else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
-                shaderConfirm = false;
-                shaderAccepted();
-            }
+            else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) startDesign();
             return true;
         }
         if (name.isFocused()) {
@@ -492,7 +410,7 @@ public final class BlueprintTableScreen extends AbstractContainerScreen<Blueprin
 
     @Override
     public boolean charTyped(char c, int mods) {
-        if (confirming || shaderConfirm) return true;
+        if (confirming) return true;
         if (name.isFocused()) return name.charTyped(c, mods);
         return super.charTyped(c, mods);
     }

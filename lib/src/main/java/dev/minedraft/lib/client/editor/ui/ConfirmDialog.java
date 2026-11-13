@@ -18,6 +18,7 @@ public class ConfirmDialog extends Modal<AreaEditorScreen> {
     private final Component confirm;
     private final boolean danger;
     private final Runnable onConfirm;
+    private Runnable onCancel = () -> {};
     private int cancelX, confirmX, buttonsY;
 
     public ConfirmDialog(AreaEditorScreen screen, Component title, List<Component> lines, @Nullable Component warning,
@@ -29,6 +30,12 @@ public class ConfirmDialog extends Modal<AreaEditorScreen> {
         this.confirm = confirm;
         this.danger = danger;
         this.onConfirm = onConfirm;
+    }
+
+    /** 취소(버튼·Esc) 때 할 일 (기본은 창만 닫음). */
+    public ConfirmDialog onCancel(Runnable r) {
+        this.onCancel = r;
+        return this;
     }
 
     private List<FormattedCharSequence> wrapped(Component c) {
@@ -80,6 +87,7 @@ public class ConfirmDialog extends Modal<AreaEditorScreen> {
             onConfirm.run();
         } else if (Ui.inside(mx, my, cancelX, buttonsY, buttonWidth(Component.translatable("minedraftlib.dialog.cancel")), 16)) {
             close();
+            onCancel.run();
         }
         return true;
     }
@@ -88,6 +96,7 @@ public class ConfirmDialog extends Modal<AreaEditorScreen> {
     public boolean keyPressed(int key, int scan, int mods) {
         if (key == GLFW.GLFW_KEY_ESCAPE) {
             close();
+            onCancel.run();
         } else if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) && !danger) {
             close();
             onConfirm.run();

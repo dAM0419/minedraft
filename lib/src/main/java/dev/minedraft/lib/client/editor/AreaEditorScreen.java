@@ -98,6 +98,8 @@ public abstract class AreaEditorScreen extends Screen {
     private long lastCursorSend;
     private String lastCursorKey = "";
     private long lastPanNanos;
+    /** 셰이더 팩 경고를 이미 확인했는가 (편집창을 열 때마다 한 번). */
+    private boolean shaderChecked;
 
     protected AreaEditorScreen(Component title, AreaEditorSession session) {
         super(title);
@@ -253,6 +255,15 @@ public abstract class AreaEditorScreen extends Screen {
         if (!base.ready || base.renderer == null) {
             renderLoading(g);
             return;
+        }
+        if (!shaderChecked) {
+            // 셰이더 팩이 켜져 있으면 그래픽이 깨지므로, 불러오기가 끝나면 먼저 경고한다 (취소 = 편집창 닫기)
+            shaderChecked = true;
+            if (dev.minedraft.lib.client.ShaderPacks.inUse() && modal == null) {
+                openModal(new dev.minedraft.lib.client.editor.ui.ConfirmDialog(this, Component.translatable("minedraftlib.shader.title"),
+                        List.of(), Component.translatable("minedraftlib.shader.warning"),
+                        Component.translatable("minedraftlib.shader.open_anyway"), false, () -> {}).onCancel(this::onClose));
+            }
         }
         base.tickEffects();
         base.checkCutChanged();

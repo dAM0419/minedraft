@@ -326,25 +326,6 @@ public final class ProjectionRenderer {
 
     @Nullable
     private static TextureTarget ghostTarget;
-    @Nullable
-    private static Boolean irisPresent;
-
-    /** Iris 셰이더 팩이 켜져 있는가 (비지원 안내용). */
-    public static boolean shaderPackInUse() {
-        try {
-            if (irisPresent == null) {
-                irisPresent = net.neoforged.fml.ModList.get().isLoaded("iris")
-                        || net.neoforged.fml.ModList.get().isLoaded("oculus");
-            }
-            if (!irisPresent) return false;
-            Class<?> api = Class.forName("net.irisshaders.iris.api.v0.IrisApi");
-            Object inst = api.getMethod("getInstance").invoke(null);
-            return (Boolean) api.getMethod("isShaderPackInUse").invoke(inst);
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
     private static void drawGhostLayers(List<SectionVisual> visible, Matrix4f view, Matrix4f proj, Vec3 cam) {
         for (int layer = 0; layer < BlockMesher.LAYER_COUNT; layer++) {
             RenderType type = BlockMesher.layerType(layer);
