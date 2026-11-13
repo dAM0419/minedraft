@@ -351,7 +351,7 @@ public final class EditorSession extends AreaEditorSession {
                 if (above != null && !above.isAir() && !(cutActive && isCut(x, y + 1, z))) continue;
                 dev.minedraft.lib.space.SpaceTag t = r.tag().space();
                 int rgb = t == null ? Ui.DEMOLISH : t.color();
-                color = Ui.withAlpha(0xFF000000 | rgb, r.tag() == DesignTag.STRUCTURE ? 80 : 110);
+                color = Ui.withAlpha(0xFF000000 | rgb, r.tag() == DesignTag.STRUCTURE ? 100 : 140);
             }
             if (!out.accept(x, y, z, color)) return;
         }

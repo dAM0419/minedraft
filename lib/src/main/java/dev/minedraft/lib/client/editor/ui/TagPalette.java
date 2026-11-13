@@ -51,9 +51,9 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
         return rows;
     }
 
-    /** 줄 수 (붓 줄 포함). */
+    /** 줄 수 (태그 표시·붓 줄 포함). */
     public int rows() {
-        return rowList().size() + 1;
+        return rowList().size() + 2;
     }
 
     @Override
@@ -81,6 +81,14 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
             }
             ry += ROW;
         }
+        // 태그 표시 (T): 칸마다 태그 색으로 덮어 바닥·길·구조물 등을 구분해 본다
+        boolean on = screen.tagView;
+        boolean hover = Ui.inside(mx, my, x + 1, ry, w - 2, ROW);
+        if (hover) g.fill(x + 1, ry, x + w - 1, ry + ROW, Ui.HOVER);
+        Ui.icon(g, Icons.EYE, x + 5, ry - 1, on ? Ui.ACCENT : Ui.DIM);
+        Ui.text(g, Component.translatable(on ? "minedraftlib.tag.view_on" : "minedraftlib.tag.view_off"), x + 24, ry + 3,
+                on ? Ui.TEXT : Ui.DIM);
+        ry += ROW;
         Ui.text(g, Component.translatable("minedraftlib.editor.tag_brush", t.brush), x + 5, ry + 3, Ui.DIM);
     }
 
@@ -101,6 +109,8 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
             Row r = list.get(i);
             if (r.erase()) tool().selectErase(r.group());
             else if (r.tag() != null) tool().select(r.tag());
+        } else if (i == list.size()) {
+            screen.tagView = !screen.tagView;
         }
         return true;
     }
