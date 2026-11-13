@@ -5,14 +5,25 @@ import dev.minedraft.lib.client.editor.TagTool;
 import dev.minedraft.lib.client.ui.Icons;
 import dev.minedraft.lib.client.ui.Ui;
 import dev.minedraft.lib.space.SpaceTag;
+import dev.minedraft.lib.space.TagGroup;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/** 공간 지정 도구가 켜져 있을 때 뷰포트 왼쪽 위에 뜨는 태그 목록 (고르기) 과 붓 크기. */
+/**
+ * 공간 지정 도구가 켜져 있을 때 뷰포트 왼쪽 위에 뜨는 태그 목록. 묶음마다 제목, 태그들, (지우기).
+ * 맨 아래는 붓 크기.
+ */
 public final class TagPalette extends UiPart<AreaEditorScreen> {
     public static final int WIDTH = 120, ROW = 14;
+
+    /** 한 줄: 묶음 제목(tag·erase 없음) / 태그 / 묶음 지우기. */
+    private record Row(TagGroup group, @Nullable SpaceTag tag, boolean erase) {}
+
+    private final List<Row> rows = new ArrayList<>();
 
     public TagPalette(AreaEditorScreen screen) {
         super(screen);
@@ -27,9 +38,22 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
         return tool().active;
     }
 
-    /** 줄 수: 제목 + 태그들 + (지우기) + 붓. */
+    private List<Row> rowList() {
+        rows.clear();
+        for (TagGroup g : tool().groups()) {
+            List<SpaceTag> tags = tool().paintable(g);
+            boolean erase = tool().canErase(g);
+            if (tags.isEmpty() && !erase) continue;
+            rows.add(new Row(g, null, false));
+            for (SpaceTag t : tags) rows.add(new Row(g, t, false));
+            if (erase) rows.add(new Row(g, null, true));
+        }
+        return rows;
+    }
+
+    /** 줄 수 (붓 줄 포함). */
     public int rows() {
-        return 2 + tool().paintable().size() + (tool().canErase() ? 1 : 0);
+        return rowList().size() + 1;
     }
 
     @Override
@@ -42,17 +66,19 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
         TagTool t = tool();
         g.fill(x, y, x + w, y + h, 0xE0101418);
         Ui.border(g, x, y, w, h, 0xFF4A5563);
-        Ui.text(g, Component.translatable("minedraftlib.tool.tags"), x + 5, y + 3, Ui.DIM);
-        int ry = y + ROW;
         SpaceTag cur = t.current();
-        List<SpaceTag> tags = t.paintable();
-        for (SpaceTag tag : tags) {
-            boolean active = !t.erase && cur == tag;
-            row(g, mx, my, ry, tag.icon(), 0xFF000000 | tag.color(), Component.translatable(tag.nameKey()), active);
-            ry += ROW;
-        }
-        if (t.canErase()) {
-            row(g, mx, my, ry, Icons.ERASE, Ui.DEMOLISH, Component.translatable("minedraftlib.tag.erase"), t.erase);
+        TagGroup curGroup = t.currentGroup();
+        int ry = y + 1;
+        for (Row r : rowList()) {
+            if (r.tag() == null && !r.erase()) {
+                Ui.text(g, Ui.clip(Component.translatable(r.group().nameKey()).getString(), w - 10), x + 5, ry + 3, Ui.DIM);
+            } else if (r.erase()) {
+                boolean active = cur == null && curGroup == r.group();
+                row(g, mx, my, ry, Icons.ERASE, Ui.DEMOLISH, Component.translatable("minedraftlib.tag.erase"), active);
+            } else {
+                SpaceTag tag = r.tag();
+                row(g, mx, my, ry, tag.icon(), 0xFF000000 | tag.color(), Component.translatable(tag.nameKey()), cur == tag);
+            }
             ry += ROW;
         }
         Ui.text(g, Component.translatable("minedraftlib.editor.tag_brush", t.brush), x + 5, ry + 3, Ui.DIM);
@@ -69,14 +95,12 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        TagTool t = tool();
-        int i = (int) ((my - y) / ROW) - 1;
-        List<SpaceTag> tags = t.paintable();
-        if (i >= 0 && i < tags.size()) {
-            t.tag = tags.get(i);
-            t.erase = false;
-        } else if (i == tags.size() && t.canErase()) {
-            t.erase = true;
+        int i = (int) ((my - y - 1) / ROW);
+        List<Row> list = rowList();
+        if (i >= 0 && i < list.size()) {
+            Row r = list.get(i);
+            if (r.erase()) tool().selectErase(r.group());
+            else if (r.tag() != null) tool().select(r.tag());
         }
         return true;
     }

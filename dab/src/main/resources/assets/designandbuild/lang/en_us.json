@@ -370,6 +370,7 @@
   "designandbuild.tag.path.tip": "Paths — built after the floor",
   "designandbuild.tag.structure": "Structure",
   "designandbuild.tag.structure.tip": "Belongs to the selected structure (a new one if none is selected)",
+  "designandbuild.tag_group.stage": "Build stage",
   "designandbuild.tagaxis.kind": "Kind",
   "designandbuild.tagaxis.source": "Source",
   "designandbuild.tagaxis.terrain": "Terrain",

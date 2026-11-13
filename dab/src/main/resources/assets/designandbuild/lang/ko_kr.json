@@ -370,6 +370,7 @@
   "designandbuild.tag.path.tip": "길 — 바닥 다음에 놓습니다",
   "designandbuild.tag.structure": "구조물",
   "designandbuild.tag.structure.tip": "선택한 구조물에 속합니다 (선택이 없으면 새 구조물)",
+  "designandbuild.tag_group.stage": "건설 단계",
   "designandbuild.tagaxis.kind": "종류",
   "designandbuild.tagaxis.source": "출처",
   "designandbuild.tagaxis.terrain": "지형",

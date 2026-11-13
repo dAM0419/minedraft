@@ -324,9 +324,16 @@ public final class EditorSession extends AreaEditorSession {
     }
 
     /** 서버가 도면 전체를 다시 보냄 (순서가 어긋났을 때). */
-    /** 태그 보기: 설계 칸 윗면을 태그 색으로 (철거할 칸은 빨강, 구조물 칸은 옅게). */
+    /** 태그 보기: DaB 묶음은 설계 칸 윗면을 태그 색으로 (철거할 칸은 빨강, 구조물 칸은 옅게), 다른 모드 묶음은 Lib 기본대로. */
     @Override
     public void forEachTagCell(TagCellSink out) {
+        boolean[] stopped = {false};
+        forEachLayerTag((x, y, z, c) -> {
+            if (out.accept(x, y, z, c)) return true;
+            stopped[0] = true;
+            return false;
+        }, g -> !g.equals(dev.designandbuild.core.DabTags.GROUP));
+        if (stopped[0]) return;
         for (it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry<Resolved> e : model.resolvedMap().long2ObjectEntrySet()) {
             Resolved r = e.getValue();
             long p = e.getLongKey();

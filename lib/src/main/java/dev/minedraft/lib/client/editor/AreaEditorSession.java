@@ -107,18 +107,30 @@ public abstract class AreaEditorSession implements ClientEditor {
     }
 
     /**
-     * 태그 보기에 덮을 칸. 기본: 공간 태그 층의 칸 중 잘리지 않았고 바로 위 칸에 태그가 없는 것 (쌓인 칸은 맨 위만).
-     * 모드가 자기 데이터로 바꿀 수 있다 (DaB: 설계 칸과 철거 표시).
+     * 태그 보기에 덮을 칸. 기본: 모든 묶음의 공간 태그 칸 ({@link #forEachLayerTag}).
+     * 모드가 자기 묶음만 자기 데이터로 바꿀 수 있다 (DaB: 설계 칸과 철거 표시).
      */
     public void forEachTagCell(TagCellSink out) {
+        forEachLayerTag(out, g -> true);
+    }
+
+    /**
+     * 공간 태그 층의 칸 중 묶음 조건에 맞는 것: 잘리지 않았고 바로 위 칸에 같은 묶음 태그가 없는 것 (쌓인 칸은 맨 위만).
+     * 묶음마다 조금씩 높여 덮어 겹친 태그가 함께 보이게 한다.
+     */
+    protected final void forEachLayerTag(TagCellSink out, java.util.function.Predicate<net.minecraft.resources.ResourceLocation> groups) {
         dev.minedraft.lib.space.SpaceTagLayer l = dev.minedraft.lib.space.SpaceTagLayer.of(area);
         if (l == null) return;
-        for (var e : l.cells().long2ObjectEntrySet()) {
-            long p = e.getLongKey();
-            int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
-            if (cutActive && isCut(x, y, z)) continue;
-            if (l.tagAt(BlockPos.asLong(x, y + 1, z)) != null && !(cutActive && isCut(x, y + 1, z))) continue;
-            if (!out.accept(x, y, z, 0x6E000000 | (e.getValue().color() & 0xFFFFFF))) return;
+        for (net.minecraft.resources.ResourceLocation g : l.groupIds()) {
+            if (!groups.test(g)) continue;
+            var cells = l.cells(g);
+            for (var e : cells.long2ObjectEntrySet()) {
+                long p = e.getLongKey();
+                int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
+                if (cutActive && isCut(x, y, z)) continue;
+                if (cells.get(BlockPos.asLong(x, y + 1, z)) != null && !(cutActive && isCut(x, y + 1, z))) continue;
+                if (!out.accept(x, y, z, 0x6E000000 | (e.getValue().color() & 0xFFFFFF))) return;
+            }
         }
     }
 

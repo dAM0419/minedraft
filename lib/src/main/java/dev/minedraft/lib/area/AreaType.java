@@ -1,13 +1,13 @@
 package dev.minedraft.lib.area;
 
-import dev.minedraft.lib.space.SpaceTag;
+import dev.minedraft.lib.space.TagGroup;
 import dev.minedraft.lib.space.SpaceTagLayer;
-import dev.minedraft.lib.space.TagPolicy;
 import java.util.ArrayList;
 
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -18,31 +18,43 @@ import java.util.function.Function;
  *
  * @param maxChunks     넓힐 수 있는 최대 청크 수
  * @param initialRadius 새 영역의 처음 크기: 기준 청크 둘레 반경 (1 = 3×3)
- * @param layers        층 만들기 (순서대로 붙는다). 태그가 있으면 공간 태그 층({@link SpaceTagLayer})이 맨 앞에 자동으로 붙는다
- * @param tags          이 영역에서 쓰는 공간 태그 (없으면 공간 지정 없음)
- * @param tagPolicy     공간 태그를 칠할 수 있는 칸·태그
+ * @param layers        층 만들기 (순서대로 붙는다). 공간 태그 층({@link SpaceTagLayer})은 맨 앞에 늘 붙는다
+ * @param tagGroups     이 영역에서 쓰는 공간 태그 묶음 ({@link #addTagGroup}, 다른 모드도 붙일 수 있다)
  */
 public record AreaType(ResourceLocation id, int maxChunks, int initialRadius, List<Function<Area, AreaLayer>> layers,
-                       List<SpaceTag> tags, TagPolicy tagPolicy) {
+                       Map<ResourceLocation, TagGroup> tagGroups) {
     public AreaType {
-        tags = List.copyOf(tags);
-        if (!tags.isEmpty()) {
-            List<Function<Area, AreaLayer>> all = new ArrayList<>();
-            all.add(SpaceTagLayer::new);
-            all.addAll(layers);
-            layers = List.copyOf(all);
-        } else {
-            layers = List.copyOf(layers);
-        }
+        List<Function<Area, AreaLayer>> all = new ArrayList<>();
+        all.add(SpaceTagLayer::new);
+        all.addAll(layers);
+        layers = List.copyOf(all);
+        tagGroups = new LinkedHashMap<>(tagGroups);
     }
 
-    /** 공간 태그 없는 영역. */
     public AreaType(ResourceLocation id, int maxChunks, int initialRadius, List<Function<Area, AreaLayer>> layers) {
-        this(id, maxChunks, initialRadius, layers, List.of(), TagPolicy.DEFAULT);
+        this(id, maxChunks, initialRadius, layers, Map.of());
+    }
+
+    /**
+     * 공간 태그 묶음을 붙인다. 모드 생성자에서 (서버·클라이언트 같은 순서로). 다른 모드의 영역 종류에도 붙일 수 있다
+     * (예: Civilize 가 DaB 도면에 구역 묶음을 붙이면 같은 칸에 DaB 태그와 겹쳐 칠할 수 있다).
+     */
+    public AreaType addTagGroup(TagGroup group) {
+        if (tagGroups.putIfAbsent(group.id(), group) != null) throw new IllegalStateException("Duplicate tag group " + group.id() + " in " + id);
+        return this;
+    }
+
+    @org.jetbrains.annotations.Nullable
+    public TagGroup tagGroup(ResourceLocation id) {
+        return tagGroups.get(id);
+    }
+
+    public java.util.Collection<TagGroup> groups() {
+        return java.util.Collections.unmodifiableCollection(tagGroups.values());
     }
 
     public boolean hasTags() {
-        return !tags.isEmpty();
+        return !tagGroups.isEmpty();
     }
 
     private static final Map<ResourceLocation, AreaType> TYPES = new HashMap<>();

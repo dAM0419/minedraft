@@ -64,7 +64,7 @@ public final class BlueprintModel implements AreaLayer {
     public static final int MAX_CHUNKS = 100;
     /** DaB 도면 영역: 처음 3×3 청크, 최대 100 청크, 공간 태그(바닥·길·구조물) + 설계층. */
     public static final AreaType AREA_TYPE = new AreaType(DesignAndBuild.rl("blueprint"), MAX_CHUNKS, 1,
-            List.of(BlueprintModel::new), DabTags.ALL, DabTags.POLICY);
+            List.of(BlueprintModel::new)).addTagGroup(DabTags.STAGE);
 
     public static BlueprintModel of(Area area) {
         return area.layer(KEY);
@@ -130,7 +130,7 @@ public final class BlueprintModel implements AreaLayer {
 
     /** 실제 블록인 지형 칸의 태그 (공간 태그 층에서, 없거나 다른 태그면 바닥). */
     private DesignTag terrainTag(long pos) {
-        return DesignTag.of(tags.tagAt(pos)) == DesignTag.PATH ? DesignTag.PATH : DesignTag.FLOOR;
+        return DesignTag.of(tags.tagAt(pos, DabTags.GROUP)) == DesignTag.PATH ? DesignTag.PATH : DesignTag.FLOOR;
     }
 
     @Override
@@ -298,7 +298,7 @@ public final class BlueprintModel implements AreaLayer {
             if (!cell.equals(old)) pending.add(pos);
         }
         // 태그 원본은 Lib 공간 태그 층 (철거·빈 칸은 태그 없음)
-        tags.putQuiet(pos, cell == null || !cell.isRealBlock() ? null : cell.tag().space());
+        tags.putQuiet(pos, DabTags.GROUP, cell == null || !cell.isRealBlock() ? null : cell.tag().space());
     }
 
     public void putStructureBlock(StructureInstance s, long pos, @Nullable BlockState state) {

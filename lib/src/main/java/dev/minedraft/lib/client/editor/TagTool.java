@@ -6,7 +6,9 @@ import dev.minedraft.lib.client.ui.Ui;
 import dev.minedraft.lib.space.SpaceTag;
 import dev.minedraft.lib.space.SpaceTagEdits;
 import dev.minedraft.lib.space.SpaceTagLayer;
+import dev.minedraft.lib.space.TagGroup;
 import dev.minedraft.lib.space.TagPolicy;
+import net.minecraft.resources.ResourceLocation;
 import dev.minedraft.lib.util.Box;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -20,7 +22,8 @@ import java.util.List;
 
 /**
  * 공간 지정 도구 (Lib 공통): 커서 아래 칸에 붓 크기만큼 공간 태그를 칠한다. 끌면 이어서 칠하고, 한 번 끈 것은 되돌리기 한 번.
- * 칠할 수 있는 태그·칸은 영역 종류의 {@link TagPolicy} 가 정한다 (서버가 다시 거른다).
+ * 한 번에 한 묶음({@link TagGroup})만 칠한다: 다른 묶음의 태그는 그대로 남아 겹친다.
+ * 칠할 수 있는 태그·칸은 묶음의 {@link TagPolicy} 가 정한다 (서버가 다시 거른다).
  * <ul>
  *     <li>좌클릭·끌기: 칠하기 &nbsp; 휠클릭: 커서 칸의 태그 집기 &nbsp; Alt+휠: 붓 크기</li>
  * </ul>
@@ -31,10 +34,11 @@ public final class TagTool {
     private final AreaEditorScreen screen;
     /** 켜져 있으면 모드 도구 대신 이 도구가 뷰포트 입력을 받는다. */
     public boolean active;
-    /** 칠할 태그 (null + erase = 지우기). */
+    /** 칠할 태그. eraseGroup 이 있으면 그 묶음 태그 지우기. */
     @Nullable
     public SpaceTag tag;
-    public boolean erase;
+    @Nullable
+    public ResourceLocation eraseGroup;
     public int brush = 1;
 
     private boolean stroking;
@@ -49,30 +53,59 @@ public final class TagTool {
         return screen.session().area;
     }
 
-    private TagPolicy policy() {
-        return area().type.tagPolicy();
-    }
-
     /** 이 영역에서 공간 지정을 쓸 수 있는가. */
     public boolean available() {
         return area().type.hasTags() && SpaceTagLayer.of(area()) != null;
     }
 
-    public List<SpaceTag> paintable() {
-        return policy().paintable(area());
+    /** 영역의 태그 묶음 (붙은 순서). */
+    public java.util.Collection<TagGroup> groups() {
+        return area().type.groups();
     }
 
-    public boolean canErase() {
-        return policy().canErase(area());
+    public List<SpaceTag> paintable(TagGroup g) {
+        return g.policy().paintable(area(), g);
     }
 
-    /** 지금 칠할 것 (지우기면 null). 고른 게 없거나 칠할 수 없게 되었으면 첫 태그. */
+    public boolean canErase(TagGroup g) {
+        return g.policy().canErase(area());
+    }
+
+    /** 지금 다루는 묶음. */
+    @Nullable
+    public TagGroup currentGroup() {
+        if (eraseGroup != null) {
+            TagGroup g = area().type.tagGroup(eraseGroup);
+            if (g != null && canErase(g)) return g;
+            eraseGroup = null;
+        }
+        SpaceTag t = current();
+        return t == null ? null : area().type.tagGroup(t.group());
+    }
+
+    /** 칠할 태그 (지우기면 null). 고른 게 없거나 칠할 수 없게 되었으면 첫 묶음의 첫 태그. */
     @Nullable
     public SpaceTag current() {
-        if (erase && canErase()) return null;
-        List<SpaceTag> list = paintable();
-        if (tag == null || !list.contains(tag)) tag = list.isEmpty() ? null : list.get(0);
-        return tag;
+        if (eraseGroup != null) return null;
+        if (tag != null) {
+            TagGroup g = area().type.tagGroup(tag.group());
+            if (g != null && paintable(g).contains(tag)) return tag;
+        }
+        tag = null;
+        for (TagGroup g : groups()) {
+            List<SpaceTag> list = paintable(g);
+            if (!list.isEmpty()) return tag = list.get(0);
+        }
+        return null;
+    }
+
+    public void select(SpaceTag t) {
+        tag = t;
+        eraseGroup = null;
+    }
+
+    public void selectErase(TagGroup g) {
+        eraseGroup = g.id();
     }
 
     public void setActive(boolean on) {
@@ -94,16 +127,17 @@ public final class TagTool {
     public long[] targets(Box b) {
         Area a = area();
         SpaceTagLayer l = SpaceTagLayer.of(a);
-        if (l == null) return new long[0];
+        TagGroup g = currentGroup();
+        if (l == null || g == null) return new long[0];
         SpaceTag t = current();
-        if (t == null && !(erase && canErase())) return new long[0];
-        TagPolicy pol = policy();
+        TagPolicy pol = g.policy();
+        ResourceLocation gid = g.id();
         LongArrayList out = new LongArrayList();
         for (int x = b.minX(); x <= b.maxX(); x++)
             for (int y = b.minY(); y <= b.maxY(); y++)
                 for (int z = b.minZ(); z <= b.maxZ(); z++) {
                     long p = BlockPos.asLong(x, y, z);
-                    if (!a.isInside(p) || l.tagAt(p) == t || !pol.allows(a, p, t)) continue;
+                    if (!a.isInside(p) || l.tagAt(p, gid) == t || !pol.allows(a, p, t)) continue;
                     out.add(p);
                 }
         return out.toLongArray();
@@ -116,12 +150,18 @@ public final class TagTool {
     void clicked(int button, @Nullable AreaEditorSession.Hit h) {
         if (button == 2) { // 휠클릭: 태그 집기
             if (h == null) return;
+            // 지금 묶음의 태그를 먼저, 없으면 그 칸의 아무 칠할 수 있는 태그
             SpaceTagLayer l = SpaceTagLayer.of(area());
-            SpaceTag t = l == null ? null : l.tagAt(h.pos().asLong());
-            if (t != null && paintable().contains(t)) {
-                tag = t;
-                erase = false;
+            if (l == null) return;
+            List<SpaceTag> here = l.tagsAt(h.pos().asLong());
+            TagGroup cg = currentGroup();
+            SpaceTag pick = null;
+            for (SpaceTag t : here) {
+                TagGroup g = area().type.tagGroup(t.group());
+                if (g == null || !paintable(g).contains(t)) continue;
+                if (pick == null || (cg != null && t.group().equals(cg.id()))) pick = t;
             }
+            if (pick != null) select(pick);
             return;
         }
         if (button != 0) return;
@@ -158,7 +198,9 @@ public final class TagTool {
         LongArrayList send = new LongArrayList();
         for (long p : t) if (done.add(p)) send.add(p);
         if (send.isEmpty()) return;
-        screen.session().send(new SpaceTagEdits.Paint(group, send.toLongArray(), current()));
+        TagGroup g = currentGroup();
+        if (g == null) return;
+        screen.session().send(new SpaceTagEdits.Paint(group, send.toLongArray(), g.id(), current()));
     }
 
     // ------------------------------------------------------------------
@@ -179,8 +221,17 @@ public final class TagTool {
         lines.add(Component.literal(name + " · " + brush + "×" + brush + "×" + brush + " · ")
                 .append(Component.translatable("minedraftlib.editor.tag_cells", n)));
         SpaceTagLayer l = SpaceTagLayer.of(area());
-        SpaceTag here = l == null ? null : l.tagAt(h.pos().asLong());
-        if (here != null) lines.add(Component.translatable("minedraftlib.editor.tag_here", Component.translatable(here.nameKey())));
+        if (l != null) {
+            List<SpaceTag> here = l.tagsAt(h.pos().asLong());
+            if (!here.isEmpty()) {
+                StringBuilder b = new StringBuilder();
+                for (SpaceTag x : here) {
+                    if (b.length() > 0) b.append(", ");
+                    b.append(Component.translatable(x.nameKey()).getString());
+                }
+                lines.add(Component.translatable("minedraftlib.editor.tag_here", b.toString()));
+            }
+        }
         return lines;
     }
 }
