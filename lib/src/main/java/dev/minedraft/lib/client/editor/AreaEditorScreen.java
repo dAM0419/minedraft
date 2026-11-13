@@ -9,6 +9,7 @@ import dev.minedraft.lib.client.editor.ui.HelpOverlay;
 import dev.minedraft.lib.client.editor.ui.LayerSlider;
 import dev.minedraft.lib.client.editor.ui.Modal;
 import dev.minedraft.lib.client.editor.ui.SidePanel;
+import dev.minedraft.lib.client.editor.ui.TagPalette;
 import dev.minedraft.lib.client.editor.ui.ToolBar;
 import dev.minedraft.lib.client.editor.ui.ToolButton;
 import dev.minedraft.lib.client.editor.ui.TopBar;
@@ -56,6 +57,11 @@ public abstract class AreaEditorScreen extends Screen {
     public final SidePanel sidePanel;
     public final LayerSlider layerSlider;
     public final ViewCube viewCube;
+    /** 공간 지정 도구 (영역에 공간 태그가 있을 때). 모드 도구 단추 옆에 {@link #tagToolButton()} 을 넣는다. */
+    public final TagTool tagTool;
+    public final TagPalette tagPalette;
+    /** 공간 태그 보기 (T). */
+    public boolean tagView;
     /** 아래쪽 바 (없으면 null). 높이는 {@link UiPart#requiredHeight}. */
     @Nullable
     protected UiPart<?> bottomBar;
@@ -101,6 +107,24 @@ public abstract class AreaEditorScreen extends Screen {
         this.sidePanel = new SidePanel(this);
         this.layerSlider = new LayerSlider(this);
         this.viewCube = new ViewCube(this);
+        this.tagTool = new TagTool(this);
+        this.tagPalette = new TagPalette(this);
+        if (session.area.type.hasTags()) {
+            toggles.add(new ToolButton(Icons.EYE, "T", "minedraftlib.editor.tag_view", null, () -> tagView, () -> tagView = !tagView));
+        }
+    }
+
+    /** 툴바에 넣을 공간 지정 도구 단추 (영역에 태그가 없으면 null). 모드 도구를 고르면 {@link #setTagTool}(false). */
+    @Nullable
+    protected ToolButton tagToolButton() {
+        if (!base.area.type.hasTags()) return null;
+        return new ToolButton(Icons.TAGS, "C", "minedraftlib.tool.tags", "minedraftlib.tool.tags.tip", () -> tagTool.active,
+                () -> setTagTool(true));
+    }
+
+    /** 공간 지정 도구 켜기·끄기. 모드가 자기 도구로 바꿀 때 false 로 부른다. */
+    public void setTagTool(boolean on) {
+        tagTool.setActive(on);
     }
 
     /**
@@ -111,6 +135,7 @@ public abstract class AreaEditorScreen extends Screen {
         parts.clear();
         bottomBar = bottom;
         parts.addAll(List.of(overlays));
+        parts.add(tagPalette);
         parts.add(layerSlider);
         parts.add(viewCube);
         parts.add(sidePanel);
@@ -150,6 +175,7 @@ public abstract class AreaEditorScreen extends Screen {
     public void removed() {
         super.removed();
         onRemoved();
+        TagView.release();
         ClientAreas.editorClosed(base);
         LibConfig.save();
     }
@@ -181,6 +207,7 @@ public abstract class AreaEditorScreen extends Screen {
         vpW = W - LEFT - SidePanel.STRIP;
         if (!collapsed) vpW = W - LEFT - panelW;
         vpH = H - TOP - bottomH;
+        tagPalette.setBounds(vpX + 4, vpY + 18, TagPalette.WIDTH, tagPalette.rows() * TagPalette.ROW + 3);
         int floor = layoutOverlays();
         layerSlider.setBounds(vpX + vpW - 30, vpY + 26, 26, floor - vpY - 34);
         // 시점 큐브: 뷰포트 오른쪽 위, 층 슬라이더 왼쪽
@@ -299,6 +326,15 @@ public abstract class AreaEditorScreen extends Screen {
     protected void render2DExtras(GuiGraphics g, int mx, int my) {
     }
 
+    /** 커서 설명: 공간 지정 도구면 Lib 이, 아니면 모드가. */
+    final List<Component> chipLines() {
+        return tagTool.active && hover != null ? tagTool.chip(hover) : cursorChip();
+    }
+
+    final int chipBorder() {
+        return tagTool.active ? 0xFF4A5563 : cursorChipBorder();
+    }
+
     /** 커서 옆 작은 설명 (빈 목록이면 안 보인다). 첫 줄은 밝게. */
     protected List<Component> cursorChip() {
         return List.of();
@@ -334,7 +370,17 @@ public abstract class AreaEditorScreen extends Screen {
      * 단축키 글자는 '+' 로 잇고, 점이 든 조각은 문구 키로 번역한다 ("Ctrl+minedraftlib.key.lmb"). "@move" 는 게임 설정의 이동 키.
      */
     public String[][][] helpGroups() {
-        return new String[][][]{helpView(), helpGeneral()};
+        String[][] tags = helpTags();
+        return tags == null ? new String[][][]{helpView(), helpGeneral()} : new String[][][]{tags, helpView(), helpGeneral()};
+    }
+
+    /** 공간 지정 묶음 (영역에 태그가 없으면 null). */
+    @Nullable
+    protected String[][] helpTags() {
+        if (!base.area.type.hasTags()) return null;
+        return new String[][]{{"minedraftlib.help.tags"}, {"C", "minedraftlib.tool.tags"},
+                {"minedraftlib.key.lmb_drag", "minedraftlib.help.tag_paint"}, {"minedraftlib.key.mmb", "minedraftlib.help.tag_pick"},
+                {"Alt+minedraftlib.key.wheel", "minedraftlib.help.tag_brush"}, {"T", "minedraftlib.help.tag_view"}};
     }
 
     /** 보기 묶음. extra 는 테두리(G) 줄 앞에 끼운다. */
@@ -385,6 +431,11 @@ public abstract class AreaEditorScreen extends Screen {
             hover = null;
             return;
         }
+        if (tagTool.active) {
+            hover = base.pick(mx, my);
+            tagTool.hovered(hover);
+            return;
+        }
         hover = computeHover(mx, my);
     }
 
@@ -403,7 +454,7 @@ public abstract class AreaEditorScreen extends Screen {
     private void sendCursor() {
         long now = System.currentTimeMillis();
         if (now - lastCursorSend < 100) return;
-        Box region = hover == null ? null : cursorRegion(hover);
+        Box region = hover == null ? null : tagTool.active ? tagTool.brushBox(hover.pos()) : cursorRegion(hover);
         String key = (hover == null ? "-" : hover.pos().asLong() + ":" + hover.face()) + "|" + region + "|" + base.selected;
         if (key.equals(lastCursorKey)) return;
         lastCursorKey = key;
@@ -464,6 +515,10 @@ public abstract class AreaEditorScreen extends Screen {
             rightStartY = lastPanY = my;
             return true;
         }
+        if (tagTool.active) {
+            if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !cutClick(h)) tagTool.clicked(button, h);
+            return true;
+        }
         viewportClicked(mx, my, button, h);
         return true;
     }
@@ -498,6 +553,7 @@ public abstract class AreaEditorScreen extends Screen {
             if (!rightDragged) rightClicked(mx, my);
             return true;
         }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && tagTool.isStroking()) tagTool.released();
         viewportReleased(mx, my, button);
         return true;
     }
@@ -553,6 +609,10 @@ public abstract class AreaEditorScreen extends Screen {
             if (p.contains(mx, my) && p.mouseScrolled(mx, my, scrollY)) return true;
         }
         if (!inViewport(mx, my)) return true;
+        if (tagTool.active && hasAltDown()) {
+            tagTool.brushScroll(scrollY);
+            return true;
+        }
         viewportScrolled(mx, my, scrollY);
         return true;
     }
@@ -655,6 +715,12 @@ public abstract class AreaEditorScreen extends Screen {
                 else base.toggleCut();
             }
             case GLFW.GLFW_KEY_X -> base.bubble = !base.bubble;
+            case GLFW.GLFW_KEY_T -> {
+                if (base.area.type.hasTags()) tagView = !tagView;
+            }
+            case GLFW.GLFW_KEY_C -> {
+                if (base.area.type.hasTags()) setTagTool(!tagTool.active);
+            }
             default -> {
             }
         }
@@ -666,7 +732,7 @@ public abstract class AreaEditorScreen extends Screen {
         return false;
     }
 
-    /** 모드의 단축키 (도구 등). 받았으면 true. 기본 키(Q E Tab G H L X)보다 먼저 본다. */
+    /** 모드의 단축키 (도구 등). 받았으면 true. 기본 키(Q E Tab G H L X T C)보다 먼저 본다. */
     protected boolean editorKey(int key) {
         return false;
     }
@@ -674,6 +740,7 @@ public abstract class AreaEditorScreen extends Screen {
     /** Esc: 기본은 도움말 닫기, 아니면 편집창 닫기. */
     protected void escape() {
         if (showHelp) showHelp = false;
+        else if (tagTool.active) setTagTool(false);
         else onClose();
     }
 

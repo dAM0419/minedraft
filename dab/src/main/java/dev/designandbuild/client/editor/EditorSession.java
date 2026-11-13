@@ -1,5 +1,6 @@
 package dev.designandbuild.client.editor;
 
+import dev.minedraft.lib.client.ui.Ui;
 import dev.minedraft.lib.area.Area;
 import dev.minedraft.lib.area.AreaOp;
 import dev.minedraft.lib.client.editor.AreaEditorSession;
@@ -323,6 +324,29 @@ public final class EditorSession extends AreaEditorSession {
     }
 
     /** 서버가 도면 전체를 다시 보냄 (순서가 어긋났을 때). */
+    /** 태그 보기: 설계 칸 윗면을 태그 색으로 (철거할 칸은 빨강, 구조물 칸은 옅게). */
+    @Override
+    public void forEachTagCell(TagCellSink out) {
+        for (it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry<Resolved> e : model.resolvedMap().long2ObjectEntrySet()) {
+            Resolved r = e.getValue();
+            long p = e.getLongKey();
+            int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
+            if (cutActive && isCut(x, y, z)) continue;
+            int color;
+            if (r.isAir()) {
+                if (worldAt(x, y, z).isAir()) continue;
+                color = Ui.withAlpha(Ui.DEMOLISH, 90);
+            } else {
+                Resolved above = model.resolved(x, y + 1, z);
+                if (above != null && !above.isAir() && !(cutActive && isCut(x, y + 1, z))) continue;
+                dev.minedraft.lib.space.SpaceTag t = r.tag().space();
+                int rgb = t == null ? Ui.DEMOLISH : t.color();
+                color = Ui.withAlpha(0xFF000000 | rgb, r.tag() == DesignTag.STRUCTURE ? 80 : 110);
+            }
+            if (!out.accept(x, y, z, color)) return;
+        }
+    }
+
     @Override
     public boolean describeChunkRemoval(it.unimi.dsi.fastutil.longs.LongSet chunks, List<Component> lines) {
         int cells = 0;

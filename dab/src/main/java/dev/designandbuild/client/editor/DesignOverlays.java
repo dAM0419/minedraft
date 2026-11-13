@@ -3,28 +3,17 @@ package dev.designandbuild.client.editor;
 import static dev.minedraft.lib.client.editor.ViewportRenderer.box;
 import static dev.minedraft.lib.client.editor.ViewportRenderer.dashedBox;
 import static dev.minedraft.lib.client.editor.ViewportRenderer.fillBox;
-import dev.designandbuild.client.ui.TagColors;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.designandbuild.client.ClientConfig;
 import dev.minedraft.lib.client.render.LibRenderTypes;
 import dev.minedraft.lib.client.render.BlockMesher;
 import dev.minedraft.lib.client.render.MeshDraw;
 import dev.minedraft.lib.client.ui.Ui;
 import dev.minedraft.lib.util.Box;
-import dev.designandbuild.core.DesignTag;
-import dev.designandbuild.core.Resolved;
 import dev.designandbuild.core.StructureInstance;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import org.joml.Matrix4f;
@@ -36,22 +25,9 @@ import java.util.List;
 final class DesignOverlays {
     private DesignOverlays() {}
 
-    // 태그 보기 캐시
-    private static VertexBuffer tagBuffer;
-    private static long tagKey = Long.MIN_VALUE;
-    private static int tagOx, tagOy, tagOz;
-
-    /** 편집창을 닫을 때: 태그 보기 버퍼를 버린다 (다음 편집창의 다른 도면과 섞이지 않게). */
-    static void release() {
-        if (tagBuffer != null) tagBuffer.close();
-        tagBuffer = null;
-        tagKey = Long.MIN_VALUE;
-    }
-
-    /** 블록 메시 뒤: 태그 보기, 유령 블록. */
+    /** 블록 메시 뒤: 유령 블록. */
     static void world(EditorScreen screen, Matrix4f rot, Matrix4f proj) {
         EditorSession s = screen.session();
-        if (screen.tagView) drawTagView(s, rot, proj);
         double tx = s.camera.tx, ty = s.camera.ty, tz = s.camera.tz;
         // 유령 블록 (직접조작 미리보기·배치)
         EditorScreen.Preview pv = screen.preview;
@@ -160,66 +136,6 @@ final class DesignOverlays {
         MeshDraw.beginLayer(LibRenderTypes.GHOST, true);
         MeshDraw.draw(mesh.buffers[BlockMesher.TRANSLUCENT], mv, proj);
         MeshDraw.endLayer(LibRenderTypes.GHOST);
-    }
-
-    /** 태그 보기: 설계 칸 윗면을 태그 색으로 덮는다 (도면 판이 바뀔 때만 다시 굽는다). */
-    private static void drawTagView(EditorSession s, Matrix4f rot, Matrix4f proj) {
-        long key = s.model.revision() * 31 + s.cutStamp;
-        if (key != tagKey || tagBuffer == null) {
-            tagKey = key;
-            if (tagBuffer != null) tagBuffer.close();
-            tagBuffer = null;
-            Box a = s.model.areaBounds();
-            tagOx = a.minX();
-            tagOy = s.model.minY;
-            tagOz = a.minZ();
-            BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-            int n = 0;
-            for (Long2ObjectMap.Entry<Resolved> e : s.model.resolvedMap().long2ObjectEntrySet()) {
-                if (n > 150_000) break;
-                Resolved r = e.getValue();
-                long p = e.getLongKey();
-                int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
-                if (s.cutActive && s.isCut(x, y, z)) continue;
-                int color;
-                float top;
-                if (r.isAir()) {
-                    if (s.worldAt(x, y, z).isAir()) continue;
-                    color = Ui.withAlpha(Ui.DEMOLISH, 90);
-                    top = y + 1.01F;
-                } else {
-                    Resolved above = s.model.resolved(x, y + 1, z);
-                    if (above != null && !above.isAir() && !(s.cutActive && s.isCut(x, y + 1, z))) continue;
-                    color = Ui.withAlpha(TagColors.tagColor(r.tag()), r.tag() == DesignTag.STRUCTURE ? 80 : 110);
-                    top = y + 1.01F;
-                }
-                float fx = x - tagOx, fy = top - tagOy, fz = z - tagOz;
-                int cr = (color >> 16) & 0xFF, cg = (color >> 8) & 0xFF, cb = color & 0xFF, ca = (color >>> 24) & 0xFF;
-                b.addVertex(fx, fy, fz).setColor(cr, cg, cb, ca);
-                b.addVertex(fx, fy, fz + 1).setColor(cr, cg, cb, ca);
-                b.addVertex(fx + 1, fy, fz + 1).setColor(cr, cg, cb, ca);
-                b.addVertex(fx + 1, fy, fz).setColor(cr, cg, cb, ca);
-                n++;
-            }
-            var mesh = b.build();
-            if (mesh != null) {
-                tagBuffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-                tagBuffer.bind();
-                tagBuffer.upload(mesh);
-                VertexBuffer.unbind();
-            }
-        }
-        if (tagBuffer == null) return;
-        Matrix4f mv = new Matrix4f(rot).translate((float) (tagOx - s.camera.tx), (float) (tagOy - s.camera.ty),
-                (float) (tagOz - s.camera.tz));
-        LibRenderTypes.QUADS.setupRenderState();
-        ShaderInstance shader = RenderSystem.getShader();
-        if (shader != null) {
-            tagBuffer.bind();
-            tagBuffer.drawWithShader(mv, proj, shader);
-            VertexBuffer.unbind();
-        }
-        LibRenderTypes.QUADS.clearRenderState();
     }
 
     /** 2D: 구조물 편집 중 띠. */

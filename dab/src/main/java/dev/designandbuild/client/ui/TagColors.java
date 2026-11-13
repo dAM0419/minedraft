@@ -8,11 +8,8 @@ public final class TagColors {
     private TagColors() {}
 
     public static int tagColor(DesignTag tag) {
-        return switch (tag) {
-            case FLOOR -> Ui.FLOOR;
-            case PATH -> Ui.PATH;
-            case STRUCTURE -> Ui.STRUCTURE;
-            default -> Ui.DEMOLISH;
-        };
+        // 색은 Lib 공간 태그에 등록한 값 (철거 = 태그 없음)
+        dev.minedraft.lib.space.SpaceTag t = tag.space();
+        return t == null ? Ui.DEMOLISH : 0xFF000000 | t.color();
     }
 }

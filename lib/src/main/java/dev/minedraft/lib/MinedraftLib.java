@@ -24,6 +24,7 @@ public final class MinedraftLib {
     public MinedraftLib(IEventBus modBus, Dist dist) {
         AreaOps.bootstrap();
         EditRequests.bootstrap();
+        dev.minedraft.lib.space.SpaceTagEdits.bootstrap();
         modBus.addListener(LibNet.CHANNEL::register);
         LibServerEvents.register();
         if (dist.isClient()) LibClient.init(modBus);

@@ -96,6 +96,37 @@ public abstract class AreaEditorSession implements ClientEditor {
     /** 사본이 통째로 바뀐 뒤 (모드가 층 참조를 갈아 끼운다). */
     protected void onAreaSwapped(Area newArea) {}
 
+    // ------------------------------------------------------------------
+    // 공간 태그 보기
+    // ------------------------------------------------------------------
+
+    /** 태그 보기 칸 하나: 윗면을 color(ARGB) 로 덮는다. false 를 돌려주면 그만 받는다. */
+    @FunctionalInterface
+    public interface TagCellSink {
+        boolean accept(int x, int y, int z, int argb);
+    }
+
+    /**
+     * 태그 보기에 덮을 칸. 기본: 공간 태그 층의 칸 중 잘리지 않았고 바로 위 칸에 태그가 없는 것 (쌓인 칸은 맨 위만).
+     * 모드가 자기 데이터로 바꿀 수 있다 (DaB: 설계 칸과 철거 표시).
+     */
+    public void forEachTagCell(TagCellSink out) {
+        dev.minedraft.lib.space.SpaceTagLayer l = dev.minedraft.lib.space.SpaceTagLayer.of(area);
+        if (l == null) return;
+        for (var e : l.cells().long2ObjectEntrySet()) {
+            long p = e.getLongKey();
+            int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
+            if (cutActive && isCut(x, y, z)) continue;
+            if (l.tagAt(BlockPos.asLong(x, y + 1, z)) != null && !(cutActive && isCut(x, y + 1, z))) continue;
+            if (!out.accept(x, y, z, 0x6E000000 | (e.getValue().color() & 0xFFFFFF))) return;
+        }
+    }
+
+    /** 태그 보기를 다시 구울 때를 정하는 값 (영역 판·단면). */
+    public long tagViewKey() {
+        return area.revision() * 31 + cutStamp;
+    }
+
     /**
      * 범위 탭에서 이 청크들을 빼려 한다. 사라지는 것을 lines 에 적고, 하나라도 있으면 true (한 번 더 묻는다).
      * 기본: 어느 층이든 내용이 있는 청크가 섞였으면 true (적는 줄은 없음).

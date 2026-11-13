@@ -21,7 +21,7 @@
   "designandbuild.editor.replaces_floor": "Replaces %s floor/path cells",
   "designandbuild.editor.rotation_locked": "Rotation locked (side mount)",
   "designandbuild.editor.skipped_foreign": "%s cells of another structure skipped · Alt+click to select it",
-  "designandbuild.editor.tag_view": "Tag colors (T)",
+  "designandbuild.editor.tag_tool_hint": "Assign space: pick Floor or Path at the top left of the view. Only designed terrain blocks are retagged.",
   "designandbuild.editor.title": "DaB Editor",
   "designandbuild.erase.air": "Erase → air of the selected structure",
   "designandbuild.erase.demolish": "Erase → demolish",

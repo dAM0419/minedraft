@@ -23,6 +23,25 @@ public enum DesignTag {
         return tags;
     }
 
+    /** Lib 공간 태그 (NONE = 없음). */
+    @org.jetbrains.annotations.Nullable
+    public dev.minedraft.lib.space.SpaceTag space() {
+        return switch (this) {
+            case FLOOR -> DabTags.FLOOR;
+            case PATH -> DabTags.PATH;
+            case STRUCTURE -> DabTags.STRUCTURE;
+            default -> null;
+        };
+    }
+
+    /** Lib 공간 태그에서 (DaB 태그가 아니면 NONE). */
+    public static DesignTag of(@org.jetbrains.annotations.Nullable dev.minedraft.lib.space.SpaceTag t) {
+        if (t == DabTags.FLOOR) return FLOOR;
+        if (t == DabTags.PATH) return PATH;
+        if (t == DabTags.STRUCTURE) return STRUCTURE;
+        return NONE;
+    }
+
     public String key() {
         return name().toLowerCase(java.util.Locale.ROOT);
     }

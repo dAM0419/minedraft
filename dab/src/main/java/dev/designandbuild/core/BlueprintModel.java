@@ -1,5 +1,7 @@
 package dev.designandbuild.core;
 
+import it.unimi.dsi.fastutil.longs.LongCollection;
+import dev.minedraft.lib.space.SpaceTagLayer;
 import dev.designandbuild.DesignAndBuild;
 import dev.minedraft.lib.area.Area;
 import dev.minedraft.lib.area.AreaLayer;
@@ -60,9 +62,9 @@ public final class BlueprintModel implements AreaLayer {
     public static final ResourceLocation ID = DesignAndBuild.rl("design");
     public static final LayerKey<BlueprintModel> KEY = new LayerKey<>(ID, BlueprintModel.class);
     public static final int MAX_CHUNKS = 100;
-    /** DaB 도면 영역: 처음 3×3 청크, 최대 100 청크, 설계층 하나. */
+    /** DaB 도면 영역: 처음 3×3 청크, 최대 100 청크, 공간 태그(바닥·길·구조물) + 설계층. */
     public static final AreaType AREA_TYPE = new AreaType(DesignAndBuild.rl("blueprint"), MAX_CHUNKS, 1,
-            List.of(BlueprintModel::new));
+            List.of(BlueprintModel::new), DabTags.ALL, DabTags.POLICY);
 
     public static BlueprintModel of(Area area) {
         return area.layer(KEY);
@@ -103,6 +105,32 @@ public final class BlueprintModel implements AreaLayer {
         this.minY = area.minY;
         this.maxY = area.maxY;
         this.orderIndex.defaultReturnValue(Integer.MAX_VALUE);
+        // 지형 칸의 바닥/길 태그는 Lib 공간 태그 층이 원본: 그쪽에서 바뀌면 (공간 지정 도구·되돌리기) 여기 사본을 맞춘다
+        this.tags = area.layer(SpaceTagLayer.KEY);
+        tags.watch(this::onTagsChanged);
+    }
+
+    private final SpaceTagLayer tags;
+
+    /** 공간 태그 층의 칸이 바뀌었다: 지형 칸의 태그 사본을 고치고 다시 합친다. */
+    private void onTagsChanged(LongCollection changed) {
+        LongIterator it = changed.iterator();
+        while (it.hasNext()) {
+            long p = it.nextLong();
+            TerrainCell t = terrain.get(p);
+            if (t == null || !t.isRealBlock()) continue;
+            DesignTag now = terrainTag(p);
+            if (now != t.tag()) {
+                terrain.put(p, new TerrainCell(t.state(), now));
+                pending.add(p);
+            }
+        }
+        flush();
+    }
+
+    /** 실제 블록인 지형 칸의 태그 (공간 태그 층에서, 없거나 다른 태그면 바닥). */
+    private DesignTag terrainTag(long pos) {
+        return DesignTag.of(tags.tagAt(pos)) == DesignTag.PATH ? DesignTag.PATH : DesignTag.FLOOR;
     }
 
     @Override
@@ -269,6 +297,8 @@ public final class BlueprintModel implements AreaLayer {
             TerrainCell old = terrain.put(pos, cell);
             if (!cell.equals(old)) pending.add(pos);
         }
+        // 태그 원본은 Lib 공간 태그 층 (철거·빈 칸은 태그 없음)
+        tags.putQuiet(pos, cell == null || !cell.isRealBlock() ? null : cell.tag().space());
     }
 
     public void putStructureBlock(StructureInstance s, long pos, @Nullable BlockState state) {
@@ -402,6 +432,11 @@ public final class BlueprintModel implements AreaLayer {
     /** 불러온 직후 파생 데이터를 처음부터 만든다. */
     @Override
     public void afterLoad() {
+        // 지형 칸 태그를 공간 태그 층(먼저 불러온 원본)에서 채운다
+        for (Long2ObjectMap.Entry<TerrainCell> e : terrain.long2ObjectEntrySet()) {
+            TerrainCell c = e.getValue();
+            if (c.isRealBlock()) e.setValue(new TerrainCell(c.state(), terrainTag(e.getLongKey())));
+        }
         posIndex.clear();
         resolved.clear();
         rebuildOrderIndex();
@@ -507,17 +542,15 @@ public final class BlueprintModel implements AreaLayer {
         buf.writeVarInt(nextStructureId);
         long[] pos = new long[terrain.size()];
         BlockState[] states = new BlockState[pos.length];
-        DesignTag[] tags = new DesignTag[pos.length];
         int i = 0;
         for (Long2ObjectMap.Entry<TerrainCell> e : terrain.long2ObjectEntrySet()) {
             pos[i] = e.getLongKey();
             states[i] = e.getValue().state();
-            tags[i] = e.getValue().tag();
             i++;
         }
+        // 태그는 Lib 공간 태그 층이 따로 보낸다
         CellIO.writePositions(buf, pos);
         CellIO.writeStates(buf, states);
-        DesignTag.writeAll(buf, tags);
         List<StructureInstance> list = orderedStructures();
         buf.writeVarInt(list.size());
         for (StructureInstance st : list) {
@@ -545,9 +578,8 @@ public final class BlueprintModel implements AreaLayer {
         nextStructureId = buf.readVarInt();
         long[] pos = CellIO.readPositions(buf, ModelOps.MAX_CELLS);
         BlockState[] states = CellIO.readStates(buf, pos.length);
-        DesignTag[] tags = DesignTag.readAll(buf, pos.length);
         for (int i = 0; i < pos.length; i++) {
-            if (states[i] != null) loadTerrain(pos[i], new TerrainCell(states[i], tags[i]));
+            if (states[i] != null) loadTerrain(pos[i], new TerrainCell(states[i], DesignTag.NONE)); // 태그는 afterLoad 에서
         }
         int count = buf.readVarInt();
         for (int i = 0; i < count; i++) {
@@ -574,18 +606,16 @@ public final class BlueprintModel implements AreaLayer {
         Palette palette = new Palette();
         long[] pos = new long[terrain.size()];
         int[] st = new int[pos.length];
-        byte[] tg = new byte[pos.length];
         int i = 0;
         for (Long2ObjectMap.Entry<TerrainCell> e : terrain.long2ObjectEntrySet()) {
             pos[i] = e.getLongKey();
             st[i] = palette.id(e.getValue().state());
-            tg[i] = (byte) e.getValue().tag().ordinal();
             i++;
         }
+        // 태그는 Lib 공간 태그 층이 따로 저장한다
         CompoundTag t = new CompoundTag();
         t.putLongArray("pos", pos);
         t.putIntArray("state", st);
-        t.putByteArray("tag", tg);
         tag.put("terrain", t);
         ListTag structs = new ListTag();
         for (StructureInstance s : orderedStructures()) {
@@ -626,9 +656,8 @@ public final class BlueprintModel implements AreaLayer {
         CompoundTag t = tag.getCompound("terrain");
         long[] pos = t.getLongArray("pos");
         int[] st = t.getIntArray("state");
-        byte[] tg = t.getByteArray("tag");
-        int n = Math.min(pos.length, Math.min(st.length, tg.length));
-        for (int i = 0; i < n; i++) loadTerrain(pos[i], new TerrainCell(stateAt(palette, st[i]), DesignTag.byId(tg[i])));
+        int n = Math.min(pos.length, st.length);
+        for (int i = 0; i < n; i++) loadTerrain(pos[i], new TerrainCell(stateAt(palette, st[i]), DesignTag.NONE)); // 태그는 afterLoad 에서
         ListTag structs = tag.getList("structures", Tag.TAG_COMPOUND);
         Rotation[] rots = Rotation.values();
         Mirror[] mirrors = Mirror.values();

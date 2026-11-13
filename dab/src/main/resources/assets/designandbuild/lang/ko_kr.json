@@ -21,7 +21,7 @@
   "designandbuild.editor.replaces_floor": "바닥·길 %s칸 대체",
   "designandbuild.editor.rotation_locked": "회전 고정 (옆면 설치)",
   "designandbuild.editor.skipped_foreign": "다른 구조물 %s칸 제외 · Alt+클릭으로 선택",
-  "designandbuild.editor.tag_view": "태그 색 보기 (T)",
+  "designandbuild.editor.tag_tool_hint": "공간 지정: 뷰 왼쪽 위에서 바닥·길을 고르세요. 설계한 지형 블록의 태그만 바뀝니다.",
   "designandbuild.editor.title": "DaB 편집창",
   "designandbuild.erase.air": "지우기 → 선택한 구조물의 공기 지정",
   "designandbuild.erase.demolish": "지우기 → 철거 대상",

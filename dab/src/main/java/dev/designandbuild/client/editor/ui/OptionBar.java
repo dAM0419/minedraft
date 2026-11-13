@@ -119,6 +119,11 @@ public final class OptionBar extends DabPart {
     private void build() {
         items.clear();
         EditorSession s = screen.session();
+        if (screen.tagTool.active) {
+            // 공간 지정 도구 (Lib): 태그는 뷰포트 왼쪽 위 목록에서 고른다
+            label(Component.translatable("designandbuild.editor.tag_tool_hint").getString(), Ui.DIM);
+            return;
+        }
         switch (s.tool) {
             case DIRECT -> buildDirect(s);
             case PLACE -> buildPlace(s);

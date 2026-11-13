@@ -68,7 +68,9 @@ public final class ViewportRenderer {
             } else {
                 s.renderer.draw(s.cutActive ? EditorRenderer.Pass.LOWER : EditorRenderer.Pass.FULL, rot, proj);
             }
-            screen.renderWorldExtras(rot, proj);
+            if (screen.tagView) TagView.draw(s, rot, proj);
+            // 공간 지정 도구 중에는 모드 도구의 미리보기를 그리지 않는다
+            if (!screen.tagTool.active) screen.renderWorldExtras(rot, proj);
             drawOverlays(screen, s, rot);
         } finally {
             MeshDraw.endNoFog();
@@ -124,7 +126,7 @@ public final class ViewportRenderer {
 
         VertexConsumer quads = BUFFERS.getBuffer(LibRenderTypes.QUADS_SEE_THROUGH);
         Matrix4f m = ps.last().pose();
-        screen.drawOverlayQuads(quads, m, tx, ty, tz);
+        if (!screen.tagTool.active) screen.drawOverlayQuads(quads, m, tx, ty, tz);
         // 다른 편집자의 변경 반짝임
         for (AreaEditorSession.Flash f : s.flashes) {
             int a = (int) (120 * (1 - (now - f.time()) / 500.0));
@@ -147,7 +149,7 @@ public final class ViewportRenderer {
         mvs.set(EditorRenderer.lineView(rot, s.camera.realScale()));
         RenderSystem.applyModelViewMatrix();
         VertexConsumer lines = BUFFERS.getBuffer(LibRenderTypes.LINES_SEE_THROUGH);
-        screen.drawOverlayLines(lines, ps, tx, ty, tz);
+        if (!screen.tagTool.active) screen.drawOverlayLines(lines, ps, tx, ty, tz);
         // 다른 편집자 범위 (점선)
         for (AreaEditorSession.RemoteCursor c : s.cursors.values()) {
             if (!c.has()) continue;
@@ -156,7 +158,12 @@ public final class ViewportRenderer {
         BUFFERS.endBatch(LibRenderTypes.LINES_SEE_THROUGH);
 
         VertexConsumer solidLines = BUFFERS.getBuffer(LibRenderTypes.LINES);
-        screen.drawSolidLines(solidLines, ps, tx, ty, tz);
+        if (!screen.tagTool.active) {
+            screen.drawSolidLines(solidLines, ps, tx, ty, tz);
+        } else if (screen.hover != null) {
+            // 공간 지정 붓
+            box(solidLines, ps, screen.tagTool.brushBox(screen.hover.pos()), tx, ty, tz, screen.tagTool.color());
+        }
         // 단면 예외 칸 (단면을 켠 뒤 놓아서 잘린 쪽인데도 보이는 칸): 옅은 청록 테두리
         int exemptColor = Ui.withAlpha(Ui.ACCENT, 110);
         s.forEachShownExempt(4096, p -> {
@@ -265,7 +272,7 @@ public final class ViewportRenderer {
         }
         // 커서 칩
         if (screen.hover != null && screen.modal == null && screen.inViewport(mx, my) && !screen.isRightDragging()) {
-            List<Component> lines = screen.cursorChip();
+            List<Component> lines = screen.chipLines();
             if (!lines.isEmpty()) {
                 int w = 0;
                 for (Component c : lines) w = Math.max(w, Ui.font().width(c));
@@ -275,7 +282,7 @@ public final class ViewportRenderer {
                 if (x + w > screen.vpX + screen.vpW) x = mx - w - 6;
                 if (y + h > bottom) y = my - h - 6;
                 g.fill(x, y, x + w, y + h, 0xE0101418);
-                Ui.border(g, x, y, w, h, screen.cursorChipBorder());
+                Ui.border(g, x, y, w, h, screen.chipBorder());
                 for (int i = 0; i < lines.size(); i++) Ui.text(g, lines.get(i), x + 5, y + 3 + i * 10, i == 0 ? Ui.TEXT : Ui.DIM);
             }
         }

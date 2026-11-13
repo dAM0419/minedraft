@@ -63,7 +63,6 @@ public final class EditorScreen extends AreaEditorScreen {
 
     @Nullable
     public OrientationPopup orientationPopup;
-    public boolean tagView;
 
     // ---- 상호작용 ----
     private boolean stroking;
@@ -103,12 +102,13 @@ public final class EditorScreen extends AreaEditorScreen {
         panelTabs.add(orderTab);
         panelTabs.add(new dev.minedraft.lib.client.editor.ui.RangeTab(this));
         tools.add(new ToolButton(Icons.SELECT, "V", "designandbuild.tool.select", "designandbuild.tool.select.tip",
-                () -> s.tool == EditorSession.Tool.SELECT, () -> setTool(EditorSession.Tool.SELECT)));
+                () -> s.tool == EditorSession.Tool.SELECT && !tagTool.active, () -> setTool(EditorSession.Tool.SELECT)));
         tools.add(new ToolButton(Icons.DIRECT, "B", "designandbuild.tool.direct", "designandbuild.tool.direct.tip",
-                () -> s.tool == EditorSession.Tool.DIRECT, () -> setTool(EditorSession.Tool.DIRECT)));
+                () -> s.tool == EditorSession.Tool.DIRECT && !tagTool.active, () -> setTool(EditorSession.Tool.DIRECT)));
         tools.add(new ToolButton(Icons.PLACE, "P", "designandbuild.tool.place", "designandbuild.tool.place.tip",
-                () -> s.tool == EditorSession.Tool.PLACE, () -> setTool(EditorSession.Tool.PLACE)));
-        toggles.add(new ToolButton(Icons.TAGS, null, "designandbuild.editor.tag_view", null, () -> tagView, () -> tagView = !tagView));
+                () -> s.tool == EditorSession.Tool.PLACE && !tagTool.active, () -> setTool(EditorSession.Tool.PLACE)));
+        ToolButton tags = tagToolButton();
+        if (tags != null) tools.add(tags);
         assembleParts(optionBar, paletteBar);
     }
 
@@ -126,7 +126,6 @@ public final class EditorScreen extends AreaEditorScreen {
     @Override
     protected void onRemoved() {
         preview.close();
-        DesignOverlays.release();
         ClientConfig.save();
     }
 
@@ -230,7 +229,8 @@ public final class EditorScreen extends AreaEditorScreen {
         return new String[][][]{
                 {{"designandbuild.help.tools"}, {"V", "designandbuild.tool.select"}, {"B", "designandbuild.tool.direct"},
                         {"P", "designandbuild.tool.place"}, {"1 2 3 4", "designandbuild.help.ops"}},
-                helpView(new String[]{"T", "designandbuild.help.tag_view"}),
+                helpTags(),
+                helpView(),
                 {{"designandbuild.help.direct"}, {"minedraftlib.key.lmb", "designandbuild.help.apply"},
                         {"minedraftlib.key.lmb_drag", "designandbuild.help.paint"},
                         {"Alt+minedraftlib.key.wheel", "designandbuild.help.size"}, {"Ctrl+minedraftlib.key.wheel", "designandbuild.help.palette"},
@@ -755,7 +755,6 @@ public final class EditorScreen extends AreaEditorScreen {
             case GLFW.GLFW_KEY_4 -> setOp(EditorSession.Op.ERASE);
             case GLFW.GLFW_KEY_R -> rotateKey();
             case GLFW.GLFW_KEY_F -> mirrorKey();
-            case GLFW.GLFW_KEY_T -> tagView = !tagView;
             case GLFW.GLFW_KEY_PAGE_UP -> moveSelected(0, 1, 0);
             case GLFW.GLFW_KEY_PAGE_DOWN -> moveSelected(0, -1, 0);
             case GLFW.GLFW_KEY_DELETE -> {
@@ -774,6 +773,8 @@ public final class EditorScreen extends AreaEditorScreen {
             orientationPopup = null;
         } else if (showHelp) {
             showHelp = false;
+        } else if (tagTool.active) {
+            setTagTool(false);
         } else if (s.tool == EditorSession.Tool.PLACE && s.placing != null) {
             s.placing = null;
         } else if (s.selected != 0) {
@@ -784,6 +785,7 @@ public final class EditorScreen extends AreaEditorScreen {
     }
 
     public void setTool(EditorSession.Tool tool) {
+        setTagTool(false);
         s.tool = tool;
         stroking = false;
         moving = false;
