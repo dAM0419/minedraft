@@ -1,5 +1,7 @@
 package dev.minedraft.lib.client.editor;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.client.Minecraft;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -62,6 +64,8 @@ public abstract class AreaEditorScreen extends Screen {
     public final TagPalette tagPalette;
     /** 공간 태그 보기 (T). */
     public boolean tagView;
+    /** 몰입형 설계 (1인칭). 모드가 {@link #supportsImmersive()} 로 켜고 {@link #immersiveButton()} 을 툴바에 넣는다. */
+    public final ImmersiveView immersive;
     /** 아래쪽 바 (없으면 null). 높이는 {@link UiPart#requiredHeight}. */
     @Nullable
     protected UiPart<?> bottomBar;
@@ -111,6 +115,7 @@ public abstract class AreaEditorScreen extends Screen {
         this.viewCube = new ViewCube(this);
         this.tagTool = new TagTool(this);
         this.tagPalette = new TagPalette(this);
+        this.immersive = new ImmersiveView(this);
         if (session.area.type.hasTags()) {
             toggles.add(new ToolButton(Icons.EYE, "T", "minedraftlib.editor.tag_view", null, () -> tagView, () -> tagView = !tagView));
         }
@@ -122,6 +127,105 @@ public abstract class AreaEditorScreen extends Screen {
         if (!base.area.type.hasTags()) return null;
         return new ToolButton(Icons.TAGS, "C", "minedraftlib.tool.tags", "minedraftlib.tool.tags.tip", () -> tagTool.active,
                 () -> setTagTool(true));
+    }
+
+    // ------------------------------------------------------------------
+    // 몰입형 설계
+    // ------------------------------------------------------------------
+
+    /** 이 편집창이 몰입형 설계를 쓰는가. */
+    protected boolean supportsImmersive() {
+        return false;
+    }
+
+    /** 지금 몰입형 설계에 들어갈 수 없는 이유 (문구 키), 들어갈 수 있으면 null. 들어가 있는 동안 이유가 생기면 나온다. */
+    @Nullable
+    protected String immersiveBlocked() {
+        return null;
+    }
+
+    /** 툴바 보기 단추 (I). 몰입형 설계를 쓰지 않으면 null. */
+    @Nullable
+    protected ToolButton immersiveButton() {
+        if (!supportsImmersive()) return null;
+        return new ToolButton(Icons.PERSON, "I", "minedraftlib.immersive.title", "minedraftlib.immersive.tip", () -> immersive.active,
+                () -> setImmersive(!immersive.active));
+    }
+
+    public void setImmersive(boolean on) {
+        if (on == immersive.active) return;
+        if (!on) {
+            immersive.exit();
+            onImmersiveExit();
+            return;
+        }
+        if (!supportsImmersive()) return;
+        String why = immersiveBlocked();
+        if (why != null) {
+            base.toast(Component.translatable(why));
+            return;
+        }
+        onImmersiveEnter();
+        immersive.enter();
+    }
+
+    /** 들어가기 직전 (모드가 도구·보기를 맞춘다). */
+    protected void onImmersiveEnter() {
+    }
+
+    protected void onImmersiveExit() {
+    }
+
+    /** 좌클릭: 부수기. h 는 조준점이 가리킨 칸 (손 닿는 거리 안). */
+    protected void immersiveBreak(AreaEditorSession.Hit h) {
+    }
+
+    /** 우클릭: 놓기. h 가 없으면(허공) airTarget 칸에 놓을 수 있다. */
+    protected void immersivePlace(@Nullable AreaEditorSession.Hit h, BlockPos airTarget) {
+    }
+
+    /** 휠클릭: 블록 집기. */
+    protected void immersivePick(AreaEditorSession.Hit h) {
+    }
+
+    /** 휠: 들고 있는 블록 바꾸기 등. */
+    protected void immersiveScroll(double delta) {
+    }
+
+    /** E: 블록·아이템 고르기 창 (창이 뜨면 마우스가 풀린다). */
+    protected void openItemPicker() {
+    }
+
+    /** 몰입형 조준점이 가리키는 칸 (손 닿는 거리 안, 보이는 블록만). */
+    @Nullable
+    private AreaEditorSession.Hit immersiveHit() {
+        net.minecraft.world.phys.Vec3 o = new net.minecraft.world.phys.Vec3(immersive.x, immersive.y, immersive.z);
+        return base.pickRay(new EditorCamera.Ray(o, immersive.look()), ImmersiveView.REACH);
+    }
+
+    /** 허공에 놓을 때의 칸: 조준선 3칸 앞. */
+    private BlockPos immersiveAirTarget() {
+        net.minecraft.world.phys.Vec3 l = immersive.look();
+        return BlockPos.containing(immersive.x + l.x * 3, immersive.y + l.y * 3, immersive.z + l.z * 3);
+    }
+
+    private void immersiveClick(int button) {
+        AreaEditorSession.Hit h = hover;
+        if (tagTool.active) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE) tagTool.clicked(button, h);
+            return;
+        }
+        switch (button) {
+            case GLFW.GLFW_MOUSE_BUTTON_LEFT -> {
+                if (h != null) immersiveBreak(h);
+            }
+            case GLFW.GLFW_MOUSE_BUTTON_RIGHT -> immersivePlace(h, immersiveAirTarget());
+            case GLFW.GLFW_MOUSE_BUTTON_MIDDLE -> {
+                if (h != null) immersivePick(h);
+            }
+            default -> {
+            }
+        }
     }
 
     /** 공간 지정 도구 켜기·끄기. 모드가 자기 도구로 바꿀 때 false 로 부른다. */
@@ -176,6 +280,7 @@ public abstract class AreaEditorScreen extends Screen {
     @Override
     public void removed() {
         super.removed();
+        immersive.release();
         onRemoved();
         TagView.release();
         ClientAreas.editorClosed(base);
@@ -268,10 +373,26 @@ public abstract class AreaEditorScreen extends Screen {
         base.tickEffects();
         base.checkCutChanged();
         beforeFrame();
-        keyboardPan();
+        if (immersive.active && immersiveBlocked() != null) {
+            base.toast(Component.translatable(immersiveBlocked()));
+            setImmersive(false);
+        }
+        if (immersive.active) {
+            immersive.updateGrab(modal == null && focused == null);
+            immersive.tick();
+        } else {
+            keyboardPan();
+        }
         base.renderer.update(6_000_000L);
         afterMeshing();
-        updateHover(mx, my);
+        if (immersive.active) {
+            mouseX = mx;
+            mouseY = my;
+            hover = modal == null ? immersiveHit() : null;
+            if (tagTool.active) tagTool.hovered(hover);
+        } else {
+            updateHover(mx, my);
+        }
         sendCursor();
 
         renderViewport(g, mx, my, pt);
@@ -313,6 +434,7 @@ public abstract class AreaEditorScreen extends Screen {
 
     /** 월드와 그 위의 표시 (조각 아래). */
     protected void renderViewport(GuiGraphics g, int mx, int my, float pt) {
+        if (immersive.active) g.fill(0, 0, width, height, 0xFF8FB6E8); // 하늘
         ViewportRenderer.render(this, g, mx, my, pt);
         ViewportRenderer.render2D(this, g, mx, my);
     }
@@ -381,8 +503,24 @@ public abstract class AreaEditorScreen extends Screen {
      * 단축키 글자는 '+' 로 잇고, 점이 든 조각은 문구 키로 번역한다 ("Ctrl+minedraftlib.key.lmb"). "@move" 는 게임 설정의 이동 키.
      */
     public String[][][] helpGroups() {
-        String[][] tags = helpTags();
-        return tags == null ? new String[][][]{helpView(), helpGeneral()} : new String[][][]{tags, helpView(), helpGeneral()};
+        List<String[][]> g = new ArrayList<>();
+        String[][] imm = helpImmersive(), tags = helpTags();
+        if (imm != null) g.add(imm);
+        if (tags != null) g.add(tags);
+        g.add(helpView());
+        g.add(helpGeneral());
+        return g.toArray(new String[0][][]);
+    }
+
+    /** 몰입형 설계 묶음 (쓰지 않으면 null). */
+    @Nullable
+    protected String[][] helpImmersive() {
+        if (!supportsImmersive()) return null;
+        return new String[][]{{"minedraftlib.immersive.title"}, {"I", "minedraftlib.help.immersive_toggle"},
+                {"@move", "minedraftlib.help.immersive_move"}, {"F", "minedraftlib.help.immersive_fly"},
+                {"minedraftlib.key.lmb", "minedraftlib.help.immersive_break"}, {"minedraftlib.key.rmb", "minedraftlib.help.immersive_place"},
+                {"minedraftlib.key.mmb", "minedraftlib.help.immersive_pick"}, {"E", "minedraftlib.help.immersive_items"},
+                {"Esc", "minedraftlib.help.immersive_exit"}};
     }
 
     /** 공간 지정 묶음 (영역에 태그가 없으면 null). */
@@ -499,7 +637,16 @@ public abstract class AreaEditorScreen extends Screen {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (!base.ready) return true;
+        if (immersive.active && immersive.grabbed()) {
+            immersiveClick(button);
+            return true;
+        }
         if (modal != null) {
+            // 몰입형 설계 중 창이 떠 있어도 툴바(몰입형 단추 등)는 누를 수 있다
+            if (immersive.active && toolBar.contains(mx, my)) {
+                toolBar.mouseClicked(mx, my, button);
+                return true;
+            }
             modal.mouseClicked(mx, my, button);
             return true;
         }
@@ -553,6 +700,10 @@ public abstract class AreaEditorScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
+        if (immersive.active && immersive.grabbed()) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && tagTool.isStroking()) tagTool.released();
+            return true;
+        }
         if (modal != null) {
             modal.mouseReleased(mx, my, button);
             return true;
@@ -582,6 +733,7 @@ public abstract class AreaEditorScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (immersive.active && immersive.grabbed()) return true;
         if (modal != null) {
             modal.mouseDragged(mx, my, button, dx, dy);
             return true;
@@ -610,6 +762,11 @@ public abstract class AreaEditorScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double scrollX, double scrollY) {
+        if (immersive.active && immersive.grabbed()) {
+            if (tagTool.active) tagTool.brushScroll(scrollY);
+            else immersiveScroll(scrollY);
+            return true;
+        }
         if (modal != null) {
             modal.mouseScrolled(mx, my, scrollY);
             return true;
@@ -697,6 +854,10 @@ public abstract class AreaEditorScreen extends Screen {
             modal.keyPressed(key, scan, mods);
             return true;
         }
+        if (immersive.active) {
+            immersiveKey(key);
+            return true;
+        }
         if (key == GLFW.GLFW_KEY_ESCAPE) {
             escape();
             return true;
@@ -729,6 +890,9 @@ public abstract class AreaEditorScreen extends Screen {
             case GLFW.GLFW_KEY_T -> {
                 if (base.area.type.hasTags()) tagView = !tagView;
             }
+            case GLFW.GLFW_KEY_I -> {
+                if (supportsImmersive()) setImmersive(true);
+            }
             case GLFW.GLFW_KEY_C -> {
                 if (base.area.type.hasTags()) setTagTool(!tagTool.active);
             }
@@ -736,6 +900,30 @@ public abstract class AreaEditorScreen extends Screen {
             }
         }
         return true;
+    }
+
+    /** 몰입형 설계 중 키: Esc·I 나가기, E 고르기 창, F 비행/걷기, 스페이스 두 번 비행, Ctrl+Z/Y, H, T, C. 이동은 매 프레임 키 상태로. */
+    private void immersiveKey(int key) {
+        Minecraft mc = Minecraft.getInstance();
+        if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_I) {
+            setImmersive(false);
+        } else if (mc.options.keyInventory.matches(key, 0)) {
+            openItemPicker();
+        } else if (key == GLFW.GLFW_KEY_F) {
+            immersive.toggleFlying();
+        } else if (mc.options.keyJump.matches(key, 0)) {
+            immersive.jumpPressed();
+        } else if (hasControlDown() && key == GLFW.GLFW_KEY_Z) {
+            base.send(hasShiftDown() ? new EditRequests.Redo() : new EditRequests.Undo());
+        } else if (hasControlDown() && key == GLFW.GLFW_KEY_Y) {
+            base.send(new EditRequests.Redo());
+        } else if (key == GLFW.GLFW_KEY_H) {
+            showHelp = !showHelp;
+        } else if (key == GLFW.GLFW_KEY_T && base.area.type.hasTags()) {
+            tagView = !tagView;
+        } else if (key == GLFW.GLFW_KEY_C && base.area.type.hasTags()) {
+            setTagTool(!tagTool.active);
+        }
     }
 
     /** 떠 있는 작은 창의 키 (Ctrl 단축키보다 먼저). 받았으면 true. */

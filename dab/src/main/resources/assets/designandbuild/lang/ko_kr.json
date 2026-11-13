@@ -194,6 +194,7 @@
   "designandbuild.menu.view_below": "이 층까지",
   "designandbuild.menu.view_only": "이 층만",
   "designandbuild.msg.blueprint_missing": "도면 데이터를 찾을 수 없습니다",
+  "designandbuild.msg.immersive_needs_structure": "구조물을 선택해야 몰입형 설계로 편집할 수 있습니다",
   "designandbuild.msg.large_op_confirm": "%s블록 — 같은 자리를 한 번 더 누르면 적용합니다",
   "designandbuild.msg.mount_mismatch": "설치면 불일치",
   "designandbuild.msg.mount_up": "윗면 설치 구조물은 놓을 수 없습니다",

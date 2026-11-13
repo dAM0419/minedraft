@@ -109,6 +109,8 @@ public final class EditorScreen extends AreaEditorScreen {
                 () -> s.tool == EditorSession.Tool.PLACE && !tagTool.active, () -> setTool(EditorSession.Tool.PLACE)));
         ToolButton tags = tagToolButton();
         if (tags != null) tools.add(tags);
+        ToolButton immersiveBtn = immersiveButton();
+        if (immersiveBtn != null) toggles.add(immersiveBtn);
         assembleParts(optionBar, paletteBar);
     }
 
@@ -229,6 +231,7 @@ public final class EditorScreen extends AreaEditorScreen {
         return new String[][][]{
                 {{"designandbuild.help.tools"}, {"V", "designandbuild.tool.select"}, {"B", "designandbuild.tool.direct"},
                         {"P", "designandbuild.tool.place"}, {"1 2 3 4", "designandbuild.help.ops"}},
+                helpImmersive(),
                 helpTags(),
                 helpView(),
                 {{"designandbuild.help.direct"}, {"minedraftlib.key.lmb", "designandbuild.help.apply"},
@@ -809,6 +812,102 @@ public final class EditorScreen extends AreaEditorScreen {
 
     private void moveSelected(int dx, int dy, int dz) {
         if (s.selected != 0) s.send(new Requests.StructMove(s.selected, dx, dy, dz, 0, false));
+    }
+
+    // ------------------------------------------------------------------
+    // 몰입형 설계: 선택한 구조물 편집 (구조물만 보이는 구조물 편집 화면 그대로, 1인칭으로)
+    // ------------------------------------------------------------------
+
+    @Override
+    protected boolean supportsImmersive() {
+        return true;
+    }
+
+    @Override
+    @Nullable
+    protected String immersiveBlocked() {
+        if (s.selected == 0 || s.model.structure(s.selected) == null) return "designandbuild.msg.immersive_needs_structure";
+        if (immersive.active && s.isolated() == 0) return "designandbuild.msg.immersive_needs_structure";
+        return null;
+    }
+
+    @Override
+    protected void onImmersiveEnter() {
+        // 구조물 편집 화면(구조물만 보임)은 직접조작 도구에서 켜진다
+        setTool(EditorSession.Tool.DIRECT);
+        orientationPopup = null;
+    }
+
+    @Override
+    protected void immersiveBreak(AreaEditorSession.Hit h) {
+        it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<BlockState> cells = new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<>();
+        cells.put(h.pos().asLong(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+        ToolLogic.send(s, cells, ClientAreas.nextGroup());
+    }
+
+    /**
+     * 우클릭 놓기: 실제로 블록을 놓을 때처럼 바라보는 방향·클릭한 면·클릭 높이로 상태를 정한다 (방향 삼면도 대신).
+     * 클릭한 블록이 덮어쓸 수 있는 것(풀 등)이거나 같은 반블록이면 그 칸, 아니면 면 바깥 칸. 허공이면 조준선 앞 칸.
+     */
+    @Override
+    protected void immersivePlace(@Nullable AreaEditorSession.Hit h, BlockPos airTarget) {
+        if (s.materials[0].isEmpty()) {
+            s.toast(Component.translatable("designandbuild.msg.pick_material"));
+            return;
+        }
+        Direction savedH = s.lookH, savedFace = s.face;
+        int savedV = s.lookV;
+        boolean savedUpper = s.upperHalf;
+        EditorSession.Op savedOp = s.op;
+        try {
+            s.lookH = immersive.horizontalFacing();
+            s.lookV = immersive.pitch > 45 ? -1 : immersive.pitch < -45 ? 1 : 0;
+            BlockPos target;
+            if (h != null) {
+                s.face = h.face();
+                s.upperHalf = h.location().y - h.pos().getY() > 0.5;
+                BlockState cur = s.blockAt(h.pos().getX(), h.pos().getY(), h.pos().getZ(), false);
+                BlockState placed = PlacementStates.stateFor(s.materials[0], s.lookH, s.lookV, s.face, s.upperHalf);
+                boolean merge = placed != null && ToolLogic.slabMerge(cur, placed) != null;
+                target = cur.canBeReplaced() || merge ? h.pos() : h.pos().relative(h.face());
+            } else {
+                s.face = Direction.UP;
+                s.upperHalf = false;
+                target = airTarget;
+            }
+            if (!s.area.isInside(target.asLong())) return;
+            BlockState there = s.blockAt(target.getX(), target.getY(), target.getZ(), false);
+            if (!there.isAir() && !there.canBeReplaced() && !target.equals(h != null ? h.pos() : null)) return;
+            s.op = EditorSession.Op.INSTALL;
+            ToolLogic.Materials mats = ToolLogic.materials(s);
+            if (mats == null) {
+                s.toast(Component.translatable("designandbuild.msg.pick_material"));
+                return;
+            }
+            var cells = ToolLogic.compute(s, new long[]{target.asLong()}, mats, new java.util.Random(), false);
+            if (!cells.isEmpty()) ToolLogic.send(s, cells, ClientAreas.nextGroup());
+        } finally {
+            s.lookH = savedH;
+            s.lookV = savedV;
+            s.face = savedFace;
+            s.upperHalf = savedUpper;
+            s.op = savedOp;
+        }
+    }
+
+    @Override
+    protected void immersivePick(AreaEditorSession.Hit h) {
+        eyedropper(h);
+    }
+
+    @Override
+    protected void immersiveScroll(double delta) {
+        paletteBar.cycle(delta > 0 ? -1 : 1);
+    }
+
+    @Override
+    protected void openItemPicker() {
+        openPicker(new BlockPicker.Target(BlockPicker.Kind.MATERIAL, 0));
     }
 
     // ------------------------------------------------------------------

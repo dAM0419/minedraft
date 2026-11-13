@@ -677,12 +677,18 @@ public abstract class AreaEditorSession implements ClientEditor {
 
     @Nullable
     public Hit pick(double mx, double my) {
-        EditorCamera.Ray ray = camera.ray(mx, my);
+        return pickRay(camera.ray(mx, my), Double.MAX_VALUE);
+    }
+
+    /** 시선(원점·단위 방향)으로 보이는 칸 고르기. maxDist 를 넘으면 없음 (몰입형 설계의 손 닿는 거리). */
+    @Nullable
+    public Hit pickRay(EditorCamera.Ray ray, double maxDist) {
         Box a = area.areaBounds();
         double[] range = slab(ray, a.minX(), renderMinY, a.minZ(), a.maxX() + 1, area.maxY, a.maxZ() + 1);
         if (range == null) return null;
         Vec3 o = ray.origin(), d = ray.dir();
-        double t0 = Math.max(0, range[0] - 0.01), t1 = range[1] + 0.01;
+        double t0 = Math.max(0, range[0] - 0.01), t1 = Math.min(range[1] + 0.01, maxDist);
+        if (t1 <= t0) return null;
         Vec3 start = o.add(d.scale(t0));
         Vec3 end = o.add(d.scale(t1));
         int x = Mth.floor(start.x), y = Mth.floor(start.y), z = Mth.floor(start.z);

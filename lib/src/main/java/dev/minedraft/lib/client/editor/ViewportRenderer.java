@@ -46,10 +46,18 @@ public final class ViewportRenderer {
         g.flush();
         RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
 
-        Matrix4f proj = s.camera.projection();
-        Matrix4f rot = s.camera.rotationMatrix();
+        // 몰입형 설계: 눈 위치를 카메라 목표점 자리에 두고 원근으로 (그리는 동안만)
+        boolean imm = screen.immersive.active;
+        double savedX = s.camera.tx, savedY = s.camera.ty, savedZ = s.camera.tz;
+        if (imm) {
+            s.camera.tx = screen.immersive.x;
+            s.camera.ty = screen.immersive.y;
+            s.camera.tz = screen.immersive.z;
+        }
+        Matrix4f proj = imm ? screen.immersive.projection() : s.camera.projection();
+        Matrix4f rot = imm ? screen.immersive.rotationMatrix() : s.camera.rotationMatrix();
         RenderSystem.backupProjectionMatrix();
-        RenderSystem.setProjectionMatrix(proj, VertexSorting.ORTHOGRAPHIC_Z);
+        RenderSystem.setProjectionMatrix(proj, imm ? VertexSorting.DISTANCE_TO_ORIGIN : VertexSorting.ORTHOGRAPHIC_Z);
         Matrix4fStack mvs = RenderSystem.getModelViewStack();
         mvs.pushMatrix();
         mvs.set(rot);
@@ -58,7 +66,7 @@ public final class ViewportRenderer {
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(true);
         try {
-            boolean bubble = s.cutActive && s.bubble && screen.inViewport(mx, my);
+            boolean bubble = !imm && s.cutActive && s.bubble && screen.inViewport(mx, my);
             if (bubble) {
                 int r = LibConfig.get().bubbleRadius;
                 disc(s, mx, my, r, true);
@@ -66,13 +74,16 @@ public final class ViewportRenderer {
                 disc(s, mx, my, r, false);
                 s.renderer.draw(EditorRenderer.Pass.LOWER, rot, proj);
             } else {
-                s.renderer.draw(s.cutActive ? EditorRenderer.Pass.LOWER : EditorRenderer.Pass.FULL, rot, proj);
+                s.renderer.draw(s.cutActive && !imm ? EditorRenderer.Pass.LOWER : EditorRenderer.Pass.FULL, rot, proj);
             }
             if (screen.tagView) TagView.draw(s, rot, proj);
             // 공간 지정 도구 중에는 모드 도구의 미리보기를 그리지 않는다
-            if (!screen.tagTool.active) screen.renderWorldExtras(rot, proj);
+            if (!screen.tagTool.active && !imm) screen.renderWorldExtras(rot, proj);
             drawOverlays(screen, s, rot);
         } finally {
+            s.camera.tx = savedX;
+            s.camera.ty = savedY;
+            s.camera.tz = savedZ;
             MeshDraw.endNoFog();
             mvs.popMatrix();
             RenderSystem.applyModelViewMatrix();
@@ -126,7 +137,8 @@ public final class ViewportRenderer {
 
         VertexConsumer quads = BUFFERS.getBuffer(LibRenderTypes.QUADS_SEE_THROUGH);
         Matrix4f m = ps.last().pose();
-        if (!screen.tagTool.active) screen.drawOverlayQuads(quads, m, tx, ty, tz);
+        boolean imm = screen.immersive.active;
+        if (!screen.tagTool.active && !imm) screen.drawOverlayQuads(quads, m, tx, ty, tz);
         // 다른 편집자의 변경 반짝임
         for (AreaEditorSession.Flash f : s.flashes) {
             int a = (int) (120 * (1 - (now - f.time()) / 500.0));
@@ -149,7 +161,7 @@ public final class ViewportRenderer {
         mvs.set(EditorRenderer.lineView(rot, s.camera.realScale()));
         RenderSystem.applyModelViewMatrix();
         VertexConsumer lines = BUFFERS.getBuffer(LibRenderTypes.LINES_SEE_THROUGH);
-        if (!screen.tagTool.active) screen.drawOverlayLines(lines, ps, tx, ty, tz);
+        if (!screen.tagTool.active && !imm) screen.drawOverlayLines(lines, ps, tx, ty, tz);
         // 다른 편집자 범위 (점선)
         for (AreaEditorSession.RemoteCursor c : s.cursors.values()) {
             if (!c.has()) continue;
@@ -158,7 +170,13 @@ public final class ViewportRenderer {
         BUFFERS.endBatch(LibRenderTypes.LINES_SEE_THROUGH);
 
         VertexConsumer solidLines = BUFFERS.getBuffer(LibRenderTypes.LINES);
-        if (!screen.tagTool.active) {
+        if (imm && !screen.tagTool.active) {
+            // 몰입형: 조준점이 가리킨 칸 (바닐라처럼 옅은 검은 테두리)
+            if (screen.hover != null) {
+                BlockPos p = screen.hover.pos();
+                box(solidLines, ps, new Box(p.getX(), p.getY(), p.getZ(), p.getX(), p.getY(), p.getZ()), tx, ty, tz, 0x80000000);
+            }
+        } else if (!screen.tagTool.active) {
             screen.drawSolidLines(solidLines, ps, tx, ty, tz);
         } else if (screen.hover != null) {
             // 공간 지정 붓
@@ -240,8 +258,9 @@ public final class ViewportRenderer {
 
     public static void render2D(AreaEditorScreen screen, GuiGraphics g, int mx, int my) {
         AreaEditorSession s = screen.session();
-        // 다른 편집자 이름표
-        for (Map.Entry<UUID, AreaEditorSession.RemoteCursor> e : s.cursors.entrySet()) {
+        boolean imm = screen.immersive.active;
+        // 다른 편집자 이름표 (쿼터뷰에서만: 몰입형은 화면 투영이 달라 생략)
+        if (!imm) for (Map.Entry<UUID, AreaEditorSession.RemoteCursor> e : s.cursors.entrySet()) {
             AreaEditorSession.RemoteCursor c = e.getValue();
             if (!c.has()) continue;
             String name = s.editors.getOrDefault(c.player(), "?");
@@ -269,6 +288,20 @@ public final class ViewportRenderer {
             g.fill(screen.vpX + 4, ty - 2, screen.vpX + 5, ty + 10, Ui.WARN);
             Ui.text(g, text, screen.vpX + 9, ty, Ui.TEXT);
             ty -= 14;
+        }
+        if (imm) {
+            // 조준점과 안내
+            int cx = screen.vpX + screen.vpW / 2, cy = screen.vpY + screen.vpH / 2;
+            if (screen.modal == null) {
+                g.fill(cx - 5, cy, cx + 6, cy + 1, 0xE0FFFFFF);
+                g.fill(cx, cy - 5, cx + 1, cy + 6, 0xE0FFFFFF);
+            }
+            Component hint = Component.translatable(screen.immersive.flying ? "minedraftlib.immersive.hint_fly" : "minedraftlib.immersive.hint_walk");
+            int hw = Ui.font().width(hint);
+            int hy = screen.vpY + screen.vpH - 14;
+            g.fill(cx - hw / 2 - 4, hy - 2, cx + hw / 2 + 4, hy + 10, 0xA0101418);
+            Ui.text(g, hint, cx - hw / 2, hy, Ui.DIM);
+            return;
         }
         // 커서 칩
         if (screen.hover != null && screen.modal == null && screen.inViewport(mx, my) && !screen.isRightDragging()) {

@@ -52,6 +52,12 @@ public final class EditorBlockEntities {
         return level;
     }
 
+    /** 가짜 월드 (만들 수 없으면 null). */
+    @Nullable
+    EditorLevel levelOrNull() {
+        return level();
+    }
+
     /** 이 칸의 블록 엔티티 (블록에 블록 엔티티가 없거나 만들 수 없으면 null). */
     @Nullable
     public BlockEntity get(BlockPos pos) {

@@ -194,6 +194,7 @@
   "designandbuild.menu.view_below": "≤ Layer",
   "designandbuild.menu.view_only": "Layer",
   "designandbuild.msg.blueprint_missing": "Blueprint data not found",
+  "designandbuild.msg.immersive_needs_structure": "Select a structure to edit it in immersive design",
   "designandbuild.msg.large_op_confirm": "%s blocks — click the same spot again to apply",
   "designandbuild.msg.mount_mismatch": "Mount face mismatch",
   "designandbuild.msg.mount_up": "Hanging structures can't be placed here",

@@ -273,6 +273,7 @@ public final class EditorRenderer implements AutoCloseable {
         List<BlockMesher.Mesh> meshes = new ArrayList<>();
         Matrix4f pv = new Matrix4f(projection).mul(rotation);
         Vector4f v = new Vector4f();
+        boolean persp = projection.m23() != 0.0F;
         float margin = 16.0F * s.camera.scale / Math.max(1, Math.min(s.camera.width(), s.camera.height())) * 2.2F;
         for (Long2ObjectMap.Entry<Entry> me : entries.long2ObjectEntrySet()) {
             Entry e = me.getValue();
@@ -282,8 +283,14 @@ public final class EditorRenderer implements AutoCloseable {
             float cx = (float) ((SectionPos.x(key) << 4) + 8 - s.camera.tx);
             float cy = (float) ((SectionPos.y(key) << 4) + 8 - s.camera.ty);
             float cz = (float) ((SectionPos.z(key) << 4) + 8 - s.camera.tz);
-            pv.transform(v.set(cx, cy, cz, 1.0F));
-            if (Math.abs(v.x) > 1 + margin || Math.abs(v.y) > 1 + margin) continue;
+            if (persp) {
+                // 원근(몰입형): 카메라 뒤에 있는 섹션과 너무 먼 섹션만 뺀다
+                rotation.transform(v.set(cx, cy, cz, 1.0F));
+                if (v.z > 14.0F || v.z < -FAR) continue;
+            } else {
+                pv.transform(v.set(cx, cy, cz, 1.0F));
+                if (Math.abs(v.x) > 1 + margin || Math.abs(v.y) > 1 + margin) continue;
+            }
             visible.add(e);
             meshes.add(mesh);
         }
@@ -306,9 +313,12 @@ public final class EditorRenderer implements AutoCloseable {
             }
             if (begun) MeshDraw.endLayer(BlockMesher.layerType(layer));
         }
-        if (LibConfig.get().blockOutlines) drawEdges(visible, pass, rotation, projection);
+        if (LibConfig.get().blockOutlines && !persp) drawEdges(visible, pass, rotation, projection);
         drawDynamic(meshes, pass);
     }
+
+    /** 몰입형에서 그리는 최대 거리 (블록). */
+    private static final float FAR = 512.0F;
 
     /** 섹션마다 만드는 모델뷰 행렬 (그리기 호출이 곧바로 셰이더에 넘기므로 하나를 돌려 쓴다). */
     private final Matrix4f scratch = new Matrix4f();
