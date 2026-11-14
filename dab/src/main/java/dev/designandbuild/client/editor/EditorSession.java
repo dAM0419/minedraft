@@ -215,11 +215,14 @@ public final class EditorSession extends AreaEditorSession {
 
     // ------------------------------------------------------------------
 
-    /** 이 칸을 지금 바꿀 수 있는가 (다른 구조물 칸은 그 구조물을 선택해야). */
+    /**
+     * 이 칸을 지금 바꿀 수 있는가. 구조물에 쓰는 조작은 다른 구조물 칸과 겹쳐도 된다
+     * (한 칸에 여러 구조물: 건축 순서가 늦은 쪽이 보이고, 다르면 충돌 표시). 지형 층 조작은 구조물 칸을 건드리지 않는다.
+     */
     public boolean editable(long pos, boolean structureTag) {
         Resolved r = model.resolved(pos);
         if (r == null || r.owner() == 0) return true;
-        return structureTag && r.owner() == selected;
+        return structureTag;
     }
 
 

@@ -178,9 +178,9 @@ public final class EditorScreen extends AreaEditorScreen {
         int x = BlockPos.getX(pos), y = BlockPos.getY(pos), z = BlockPos.getZ(pos);
         BlockState st = s.blockAt(x, y, z, false);
         if (st.isAir()) return false;
-        dev.designandbuild.core.Resolved r = s.model.resolved(pos);
-        // 다른 구조물 칸은 빼앗지 않고, 이미 넣을 구조물의 칸이면 건너뛴다
-        return r == null || r.owner() == 0;
+        // 이미 넣을 구조물의 칸이면 건너뛴다. 다른 구조물 칸은 겹쳐 넣는다 (그 구조물에서 빠지지 않는다)
+        StructureInstance sel = s.selected != 0 ? s.model.structure(s.selected) : null;
+        return sel == null || sel.get(pos) == null;
     }
 
     /**

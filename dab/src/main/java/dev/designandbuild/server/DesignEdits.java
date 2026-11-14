@@ -85,8 +85,7 @@ public final class DesignEdits {
             long p = t.pos()[i];
             BlockState st = t.states()[i];
             if (st != null && !m.isInside(p)) continue;
-            Resolved r = m.resolved(p);
-            if (r != null && r.owner() != 0 && r.owner() != id) continue; // 다른 구조물 칸은 보호
+            // 다른 구조물 칸과 겹쳐도 된다 (같은 칸에 여러 구조물: 건축 순서가 늦은 쪽이 보인다)
             BlockState before = s == null ? null : s.get(p);
             if (before == st) continue;
             pos.add(p);
