@@ -242,6 +242,35 @@ public abstract class AreaEditorScreen extends Screen {
         return false;
     }
 
+    /** 공간 지정 도구로 뷰포트를 눌렀다: 모드가 받으면 true (칠하기를 시작하지 않는다. 예: DaB 구조물 범위 손잡이). */
+    protected boolean tagToolPressed(double mx, double my, int button, @Nullable AreaEditorSession.Hit h) {
+        return false;
+    }
+
+    protected boolean tagToolDragged(double mx, double my, int button) {
+        return false;
+    }
+
+    protected boolean tagToolReleased(double mx, double my, int button) {
+        return false;
+    }
+
+    /** 공간 지정 도구 중 모드가 더 그릴 선 (붓 테두리와 함께). */
+    protected void drawTagToolLines(com.mojang.blaze3d.vertex.VertexConsumer lines, com.mojang.blaze3d.vertex.PoseStack ps,
+                                    double tx, double ty, double tz) {
+    }
+
+    /** 공간 지정 붓 테두리를 그릴지 (모드가 손잡이를 끄는 동안 등은 false). */
+    protected boolean tagBrushVisible() {
+        return true;
+    }
+
+    /** 공간 지정 도구 커서 설명을 모드가 바꿀 때 (null = Lib 기본). */
+    @Nullable
+    protected List<Component> tagToolChip() {
+        return null;
+    }
+
     /** 공간 지정 도구 켜기·끄기. 모드가 자기 도구로 바꿀 때 false 로 부른다. */
     public void setTagTool(boolean on) {
         tagTool.setActive(on);
@@ -475,7 +504,12 @@ public abstract class AreaEditorScreen extends Screen {
 
     /** 커서 설명: 공간 지정 도구면 Lib 이, 아니면 모드가. */
     final List<Component> chipLines() {
-        return tagTool.active && hover != null ? tagTool.chip(hover) : cursorChip();
+        if (tagTool.active) {
+            List<Component> custom = tagToolChip();
+            if (custom != null) return custom;
+            return hover != null ? tagTool.chip(hover) : List.of();
+        }
+        return cursorChip();
     }
 
     final int chipBorder() {
@@ -688,7 +722,9 @@ public abstract class AreaEditorScreen extends Screen {
             return true;
         }
         if (tagTool.active) {
-            if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !cutClick(h)) tagTool.clicked(button, h);
+            if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !cutClick(h)) {
+                if (!tagToolPressed(mx, my, button, h)) tagTool.clicked(button, h);
+            }
             return true;
         }
         viewportClicked(mx, my, button, h);
@@ -729,6 +765,7 @@ public abstract class AreaEditorScreen extends Screen {
             if (!rightDragged) rightClicked(mx, my);
             return true;
         }
+        if (tagTool.active) tagToolReleased(mx, my, button);
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && tagTool.isStroking()) tagTool.released();
         viewportReleased(mx, my, button);
         return true;
@@ -763,6 +800,7 @@ public abstract class AreaEditorScreen extends Screen {
             }
             return true;
         }
+        if (tagTool.active && tagToolDragged(mx, my, button)) return true;
         viewportDragged(mx, my, button);
         return true;
     }

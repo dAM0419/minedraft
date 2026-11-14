@@ -178,9 +178,12 @@ public final class ViewportRenderer {
             }
         } else if (!screen.tagTool.active) {
             screen.drawSolidLines(solidLines, ps, tx, ty, tz);
-        } else if (screen.hover != null) {
-            // 공간 지정 붓
-            box(solidLines, ps, screen.tagTool.brushBox(screen.hover.pos()), tx, ty, tz, screen.tagTool.color());
+        } else {
+            // 공간 지정 붓과 모드가 더하는 선
+            if (screen.hover != null && screen.tagBrushVisible()) {
+                box(solidLines, ps, screen.tagTool.brushBox(screen.hover.pos()), tx, ty, tz, screen.tagTool.color());
+            }
+            if (!imm) screen.drawTagToolLines(solidLines, ps, tx, ty, tz);
         }
         // 단면 예외 칸 (단면을 켠 뒤 놓아서 잘린 쪽인데도 보이는 칸): 옅은 청록 테두리
         int exemptColor = Ui.withAlpha(Ui.ACCENT, 110);
@@ -304,7 +307,7 @@ public final class ViewportRenderer {
             return;
         }
         // 커서 칩
-        if (screen.hover != null && screen.modal == null && screen.inViewport(mx, my) && !screen.isRightDragging()) {
+        if ((screen.hover != null || screen.tagTool.active) && screen.modal == null && screen.inViewport(mx, my) && !screen.isRightDragging()) {
             List<Component> lines = screen.chipLines();
             if (!lines.isEmpty()) {
                 int w = 0;
