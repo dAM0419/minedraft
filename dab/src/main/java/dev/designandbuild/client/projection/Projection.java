@@ -491,6 +491,7 @@ public final class Projection {
         if (!level.hasChunk(x >> 4, z >> 4)) return UNKNOWN;
         BlockState world = level.getBlockState(evalPos.set(x, y, z));
         BlockState t = target[i];
+        StateRules.probe(level);
         if (StateRules.matches(world, t)) return DONE;
         if (StateRules.needsDemolish(level, world, t)) return StateRules.isFillTarget(world) ? FILL : DEMOLISH;
         if (t.isAir()) return DONE;

@@ -188,6 +188,7 @@ public final class BuildService {
             mp.set(BlockPos.getX(p), BlockPos.getY(p), BlockPos.getZ(p));
             level.getChunk(mp.getX() >> 4, mp.getZ() >> 4); // 불러오기
             BlockState world = level.getBlockState(mp);
+            StateRules.probe(level);
             BlockState target = r.state();
             if (demolish) {
                 if (!StateRules.needsDemolish(level, world, target)) continue;

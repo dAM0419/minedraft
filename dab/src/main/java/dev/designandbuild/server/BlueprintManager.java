@@ -99,6 +99,7 @@ public final class BlueprintManager {
         int result = -1;
         if (level != null) {
             long total = 0, done = 0;
+            StateRules.probe(level);
             BlockPos.MutableBlockPos mp = new BlockPos.MutableBlockPos();
             for (Long2ObjectMap.Entry<Resolved> e : m.resolvedMap().long2ObjectEntrySet()) {
                 long p = e.getLongKey();

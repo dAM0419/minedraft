@@ -129,6 +129,7 @@ public final class PlaceCheck {
     public static Result spot(Level level, BlockPos p, BlockState t) {
         if (!level.isLoaded(p)) return of(UNLOADED, t);
         BlockState w = level.getBlockState(p);
+        StateRules.probe(level);
         if (StateRules.matches(w, t)) return of(DONE, t);
         if (w.isAir() || w.canBeReplaced()) return of(OK, t);
         if (StateRules.sameBlockWrongState(w, t)) return new Result(WRONG_STATE, t, null, w, 0, 0);

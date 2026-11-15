@@ -70,7 +70,9 @@ public final class StateRules {
             FluidState wf = world.getFluidState();
             return world.getBlock() == target.getBlock() && wf.isSource();
         }
-        if (world.getBlock() != target.getBlock()) return false;
+        if (world.getBlock() != target.getBlock()) {
+            return derivedEquivalent(world, target) && placementPropertiesAgree(world, target);
+        }
         for (Property<?> p : target.getProperties()) {
             if (isPlacementProperty(target, p) && world.hasProperty(p) && !world.getValue(p).equals(target.getValue(p))) {
                 return false;
@@ -79,19 +81,78 @@ public final class StateRules {
         return true;
     }
 
+    // ------------------------------------------------------------------
+    // 파생 블록: 설치된 뒤 주변 조건으로 다른 블록이 되는 것
+    // (Create: 증기기관 앞의 축 → 동력 축). 자기 아이템이 없고, 집으면 원래 블록 아이템이 나온다.
+    // ------------------------------------------------------------------
+
+    private static final java.util.concurrent.ConcurrentHashMap<Block, Item> PICK_ITEM = new java.util.concurrent.ConcurrentHashMap<>();
+    /** 집기 아이템을 물을 때 넘길 월드 (판정에 쓰는 아무 월드). 약한 참조라 월드를 붙잡지 않는다. */
+    private static volatile java.lang.ref.WeakReference<net.minecraft.world.level.LevelReader> probe = new java.lang.ref.WeakReference<>(null);
+
+    /** 판정하는 쪽이 월드를 알려 둔다 (파생 블록의 집기 아이템을 알아내는 데 쓴다). */
+    public static void probe(net.minecraft.world.level.LevelReader level) {
+        if (level != null && probe.get() != level) probe = new java.lang.ref.WeakReference<>(level);
+    }
+
+    /** 블록의 대표 아이템: 자기 아이템, 없으면 집기(픽 블록) 아이템. 끝내 없으면 공기. */
+    public static Item pickItem(Block b) {
+        Item own = b.asItem();
+        if (own != Items.AIR) return own;
+        Item cached = PICK_ITEM.get(b);
+        if (cached != null) return cached;
+        net.minecraft.world.level.LevelReader level = probe.get();
+        if (level == null) return Items.AIR; // 아직 월드를 모른다: 기억하지 않고 다음에 다시 묻는다
+        Item it;
+        try {
+            ItemStack st = b.getCloneItemStack(level, BlockPos.ZERO, b.defaultBlockState());
+            it = st.isEmpty() ? Items.AIR : st.getItem();
+        } catch (Throwable t) {
+            it = Items.AIR;
+        }
+        PICK_ITEM.put(b, it);
+        return it;
+    }
+
+    /**
+     * 한쪽이 자기 아이템 없는 파생 블록이고, 그 집기 아이템이 다른 쪽 블록의 아이템과 같다.
+     * (벽 횃불처럼 자기 아이템 매핑이 있는 블록은 해당하지 않는다: 그건 다르게 놓은 것이다.)
+     */
+    public static boolean derivedEquivalent(BlockState a, BlockState b) {
+        Block ab = a.getBlock(), bb = b.getBlock();
+        if (ab == bb) return true;
+        boolean aDerived = ab.asItem() == Items.AIR, bDerived = bb.asItem() == Items.AIR;
+        if (aDerived == bDerived) return false;
+        Item ai = pickItem(ab), bi = pickItem(bb);
+        return ai != Items.AIR && ai == bi;
+    }
+
+    /** 두 블록이 함께 가진 설치 값(방향·축 등)이 모두 같다. 이름이 같은 속성끼리 비교한다. */
+    private static boolean placementPropertiesAgree(BlockState world, BlockState target) {
+        for (Property<?> tp : target.getProperties()) {
+            if (!isPlacementProperty(target, tp)) continue;
+            for (Property<?> wp : world.getProperties()) {
+                if (!wp.getName().equals(tp.getName())) continue;
+                if (!String.valueOf(world.getValue(wp)).equals(String.valueOf(target.getValue(tp)))) return false;
+            }
+        }
+        return true;
+    }
+
     /** 같은 블록이지만 방향 등 설치 값이 다르다 (주황 외곽선). */
     public static boolean sameBlockWrongState(BlockState world, BlockState target) {
-        return !target.isAir() && world.getBlock() == target.getBlock() && !matches(world, target);
+        return !target.isAir() && derivedEquivalent(world, target) && !matches(world, target);
     }
 
     /** 목표를 이루려면 지금 있는 블록을 먼저 부숴야(메워야) 하는가. 가공으로 될 칸은 부수지 않는다. */
     public static boolean needsDemolish(Level level, BlockState world, BlockState target) {
+        probe(level);
         if (world.isAir()) return false;
         if (matches(world, target)) return false;
         FluidState wf = world.getFluidState();
         if (world.getBlock() instanceof LiquidBlock && !wf.isSource()) return false; // 흐르는 물은 원천을 치우면 사라진다
         if (!target.isAir()) {
-            if (world.getBlock() == target.getBlock()) return false; // 방향만 다름 → 해당 단계에서 고친다
+            if (derivedEquivalent(world, target)) return false; // 방향만 다름 → 해당 단계에서 고친다
             if (conversion(level, world, target) != null) return false; // 도구로 가공한다
             if (world.canBeReplaced()) return false;                  // 풀·물 등은 바로 덮어 놓을 수 있다
         }
@@ -250,7 +311,7 @@ public final class StateRules {
             return HINT_NONE;
         }
         int hint = s.is(NEEDS_SILK_TOUCH) ? HINT_SILK : HINT_NONE;
-        Item item = block.asItem();
+        Item item = pickItem(block); // 파생 블록(동력 축 등)은 집기 아이템(축)
         int count = 1;
         if (block instanceof FarmBlock) {
             item = Items.DIRT;

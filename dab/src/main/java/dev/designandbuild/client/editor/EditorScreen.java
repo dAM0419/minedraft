@@ -731,7 +731,8 @@ public final class EditorScreen extends AreaEditorScreen {
 
     private void eyedropper(EditorSession.Hit h) {
         BlockState st = s.blockAt(h.pos().getX(), h.pos().getY(), h.pos().getZ(), true);
-        ItemStack stack = new ItemStack(st.getBlock().asItem());
+        dev.designandbuild.core.StateRules.probe(net.minecraft.client.Minecraft.getInstance().level);
+        ItemStack stack = new ItemStack(dev.designandbuild.core.StateRules.pickItem(st.getBlock()));
         if (stack.isEmpty()) {
             if (!st.getFluidState().isEmpty()) stack = new ItemStack(st.getFluidState().getType().getBucket());
             if (stack.isEmpty()) return;
