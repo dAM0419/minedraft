@@ -152,14 +152,37 @@ public final class GhostBlockEntities {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void warmUp(net.minecraft.world.level.Level level, BlockEntity be) {
+        // 멀티블록(여러 블록이 하나로 합쳐지는 것: Create 탱크·금고 등)은 합체 코드가 서버에서만 돈다.
+        // 그런 블록 엔티티만 서버인 척 하는 가짜 월드에서 데우고, 그린 때는 원래 월드로 돌려 놓는다.
+        // (모든 블록 엔티티를 서버처럼 돌리면 동력망 같은 전역 등록이 가짜 월드로 오염될 수 있어 한정한다)
+        net.minecraft.world.level.Level tickLevel = level;
+        boolean multi = level instanceof FakeLevel && isMultiBlock(be.getClass());
+        if (multi) {
+            tickLevel = ((FakeLevel) level).serverView();
+            be.setLevel(tickLevel);
+        }
         try {
             BlockState st = be.getBlockState();
-            net.minecraft.world.level.block.entity.BlockEntityTicker ticker = st.getTicker(level, be.getType());
+            net.minecraft.world.level.block.entity.BlockEntityTicker ticker = st.getTicker(tickLevel, be.getType());
             if (ticker == null) return;
-            for (int i = 0; i < WARMUP_TICKS; i++) ticker.tick(level, be.getBlockPos(), st, be);
+            for (int i = 0; i < WARMUP_TICKS; i++) ticker.tick(tickLevel, be.getBlockPos(), st, be);
         } catch (Throwable ignored) {
             // 진짜 월드를 가정한 틱: 데우지 않은 채로 둔다
+        } finally {
+            if (multi) be.setLevel(level);
         }
+    }
+
+    private static final java.util.Map<Class<?>, Boolean> MULTI = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 멀티블록 블록 엔티티인가: 이름이 MultiBlockEntityContainer 인 인터페이스를 구현한다 (Create 와 그 애드온의 공통 규약). */
+    private static boolean isMultiBlock(Class<?> c) {
+        return MULTI.computeIfAbsent(c, k -> {
+            for (Class<?> x = k; x != null && x != Object.class; x = x.getSuperclass()) {
+                for (Class<?> i : x.getInterfaces()) if (i.getSimpleName().contains("MultiBlockEntityContainer")) return true;
+            }
+            return false;
+        });
     }
 
     public void clear() {

@@ -61,6 +61,10 @@ public final class FakeLevel extends Level {
             return false;
         }
 
+        /** 블록이 이 칸에 예약 틱을 걸었다 (시뮬레이션하는 쪽이 그 칸을 다시 판정하는 데 쓴다). 기본은 무시. */
+        default void scheduledTick(BlockPos pos) {
+        }
+
         /** 바이옴 (4칸 단위 좌표가 아니라 블록 좌표). 모르면 null = 실제 월드 것. */
         @Nullable
         default Holder<Biome> biome(int x, int y, int z) {
@@ -70,11 +74,28 @@ public final class FakeLevel extends Level {
 
     private final Source source;
     private final ClientLevel real;
+    @Nullable
+    private FakeLevel serverView;
+
+    /** 같은 내용을 보는 서버인 척 하는 가짜 월드 (한 번 만들어 둔다). */
+    public FakeLevel serverView() {
+        if (!isClientSide) return this;
+        if (serverView == null) serverView = new FakeLevel(source, real, minY, height, false);
+        return serverView;
+    }
     private final int minY, height;
 
     public FakeLevel(Source source, ClientLevel real, int minY, int height) {
+        this(source, real, minY, height, true);
+    }
+
+    /**
+     * clientSide = false: 서버인 척 하는 가짜 월드. "서버일 때만" 도는 블록 반응·멀티블록 합체 코드를 돌리려고 쓴다.
+     * 진짜 서버 월드(ServerLevel)를 요구하는 코드는 여전히 실패한다 (부르는 쪽이 잡는다).
+     */
+    public FakeLevel(Source source, ClientLevel real, int minY, int height, boolean clientSide) {
         super((WritableLevelData) real.getLevelData(), real.dimension(), real.registryAccess(), real.dimensionTypeRegistration(),
-                real::getProfiler, true, false, 0, 0);
+                real::getProfiler, clientSide, false, 0, 0);
         this.source = source;
         this.real = real;
         this.minY = minY;
@@ -136,12 +157,41 @@ public final class FakeLevel extends Level {
 
     @Override
     public LevelTickAccess<Block> getBlockTicks() {
-        return real.getBlockTicks();
+        return blockTicks;
     }
 
     @Override
     public LevelTickAccess<Fluid> getFluidTicks() {
-        return real.getFluidTicks();
+        return fluidTicks;
+    }
+
+    /** 예약 틱은 실제로 돌리지 않고, 어느 칸에 걸렸는지만 Source 에 알린다. */
+    private final LevelTickAccess<Block> blockTicks = new CapturingTicks<>();
+    private final LevelTickAccess<Fluid> fluidTicks = new CapturingTicks<>();
+
+    private final class CapturingTicks<T> implements LevelTickAccess<T> {
+        @Override
+        public boolean willTickThisTick(BlockPos pos, T type) {
+            return false;
+        }
+
+        @Override
+        public void schedule(net.minecraft.world.ticks.ScheduledTick<T> tick) {
+            try {
+                source.scheduledTick(tick.pos());
+            } catch (Throwable ignored) {
+            }
+        }
+
+        @Override
+        public boolean hasScheduledTick(BlockPos pos, T type) {
+            return false;
+        }
+
+        @Override
+        public int count() {
+            return 0;
+        }
     }
 
     @Override

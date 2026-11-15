@@ -87,6 +87,32 @@ public final class BlockMesher {
         }
     }
 
+    /** 같은 칸에 겹친 블록 (모델로 그리는 것만). 이웃 면 가리기는 하지 않는다 (겹친 블록은 칸을 다 채우지 않는다). */
+    private void drawExtras(BlockAndTintGetter level, CellExtras.Extras ex, BlockPos pos, int ox, int oy, int oz, float alpha,
+                            boolean allTranslucent, BlockRenderDispatcher dispatcher, ModelBlockRenderer renderer) {
+        for (int k = 0; k < ex.states().length; k++) {
+            BlockState st = ex.states()[k];
+            if (st == null || st.isAir() || st.getRenderShape() != RenderShape.MODEL) continue;
+            try {
+                BakedModel model = dispatcher.getBlockModel(st);
+                long seed = st.getSeed(pos);
+                random.setSeed(seed);
+                for (RenderType rt : model.getRenderTypes(st, random, ModelData.EMPTY)) {
+                    int layer = allTranslucent ? TRANSLUCENT : layerIndex(rt);
+                    VertexConsumer consumer = alpha < 1.0F ? wrappers[layer].set(builder(layer), 0, 0, 0, alpha) : builder(layer);
+                    pose.pushPose();
+                    pose.translate(pos.getX() - ox + ex.offsets()[k * 3], pos.getY() - oy + ex.offsets()[k * 3 + 1],
+                            pos.getZ() - oz + ex.offsets()[k * 3 + 2]);
+                    renderer.tesselateBlock(level, model, st, pos, pose, consumer, false, random, seed,
+                            OverlayTexture.NO_OVERLAY, ModelData.EMPTY, rt);
+                    pose.popPose();
+                }
+            } catch (Exception ignored) {
+                // 겹친 블록 하나가 실패해도 나머지는 그린다
+            }
+        }
+    }
+
     private BufferBuilder builder(int layer) {
         if (builders[layer] == null) {
             if (memory[layer] == null) memory[layer] = new ByteBufferBuilder(1 << 18);
@@ -110,6 +136,8 @@ public final class BlockMesher {
             while (positions.hasNext()) {
                 BlockPos pos = positions.next();
                 BlockState state = level.getBlockState(pos);
+                CellExtras.Extras ex = level instanceof CellExtras ce ? ce.extras(pos) : null;
+                if (ex != null) drawExtras(level, ex, pos, ox, oy, oz, alpha, allTranslucent, dispatcher, renderer);
                 if (state.isAir()) continue;
                 try {
                     FluidState fluid = state.getFluidState();
@@ -137,7 +165,9 @@ public final class BlockMesher {
                                 ? wrappers[layer].set(builder(layer), 0, 0, 0, alpha) : builder(layer);
                         pose.pushPose();
                         pose.translate(pos.getX() - ox, pos.getY() - oy, pos.getZ() - oz);
-                        renderer.tesselateBlock(level, model, state, pos, pose, consumer, true, random, seed,
+                        boolean moved = ex != null && ex.hostMoved();
+                        if (moved) pose.translate(ex.hx(), ex.hy(), ex.hz()); // Off-grid: 칸 안에서 옮긴 블록
+                        renderer.tesselateBlock(level, model, state, pos, pose, consumer, !moved, random, seed,
                                 OverlayTexture.NO_OVERLAY, data, rt);
                         pose.popPose();
                     }

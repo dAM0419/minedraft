@@ -38,12 +38,16 @@ final class WorldReactions {
     private static final int MAX_CELLS = 2048;
     /** 둘레 파생 블록 다시 보기는 이 칸 수까지 (칸마다 이웃 12칸). */
     private static final int REVALIDATE_MAX = 256;
+    /** 이웃 반응 연쇄: 최대 단계 수, 한 번에 판정하는 이웃 칸 수 상한. */
+    private static final int MAX_ROUNDS = 4, MAX_NEIGHBOR_CHECKS = 6_144;
 
     /** 가짜 월드가 읽고 쓰는 곳. 가짜 월드는 한 번 만들고 이 내용만 바꿔 쓴다. */
     private static final class Sim implements FakeLevel.Source {
         EditorSession s;
         Long2ObjectLinkedOpenHashMap<BlockState> cells;
         final Long2ObjectOpenHashMap<BlockState> writes = new Long2ObjectOpenHashMap<>();
+        /** 반응 중 예약 틱이 걸린 칸. 진짜 틱 대신 그 칸을 다시 설치해 판정한다. */
+        final it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet ticked = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
         boolean recording;
 
         BlockState read(long p) {
@@ -63,6 +67,11 @@ final class WorldReactions {
         @Override
         public BlockEntity blockEntity(BlockPos pos) {
             return null;
+        }
+
+        @Override
+        public void scheduledTick(BlockPos pos) {
+            if (recording && ticked.size() < 4096) ticked.add(pos.asLong());
         }
 
         @Override
@@ -105,6 +114,7 @@ final class WorldReactions {
         sim.s = s;
         sim.cells = cells;
         sim.writes.clear();
+        sim.ticked.clear();
         try {
             long[] keys = cells.keySet().toLongArray();
             // 1) 놓는 칸: 실제 자리 기준 설치 상태
@@ -118,60 +128,136 @@ final class WorldReactions {
                     }
                 }
             }
-            // 2) 설치·제거 반응이 이웃에 쓰는 변화
+            FakeLevel server = lv.serverView();
+            it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet frontier = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet(keys);
+            // 2) 설치·제거 반응이 이웃에 쓰는 변화 (서버인 척 먼저, 실패하면 클라이언트로)
             sim.recording = true;
             for (long p : keys) {
                 BlockPos pos = BlockPos.of(p);
                 BlockState old = s.blockAt(pos.getX(), pos.getY(), pos.getZ(), false);
                 BlockState now = cells.get(p);
-                if (now == null) continue;
-                try {
-                    if (!old.isAir() && old.getBlock() != now.getBlock()) old.onRemove(lv, pos, now, false);
-                    if (!now.isAir() && old.getBlock() != now.getBlock()) now.onPlace(lv, pos, old, false);
-                } catch (Throwable ignored) {
-                    // 진짜 월드(서버)를 가정한 블록: 반응 없이 둔다
-                }
+                if (now == null || old.getBlock() == now.getBlock()) continue;
+                if (!old.isAir()) react(old, () -> old.onRemove(server, pos, now, false), () -> old.onRemove(lv, pos, now, false));
+                if (!now.isAir()) react(now, () -> now.onPlace(server, pos, old, false), () -> now.onPlace(lv, pos, old, false));
+                acceptWrites(s, sim, cells, structureLayer, frontier); // 블록마다 바로 받아들인다 (실패한 반응만 버려지게)
             }
             sim.recording = false;
-            for (var e : sim.writes.long2ObjectEntrySet()) {
-                long q = e.getLongKey();
-                BlockState ns = e.getValue();
-                if (!s.model.isInside(q) || ns.isAir()) continue;
-                BlockState cur = cells.containsKey(q) ? cells.get(q) : s.blockAt(BlockPos.getX(q), BlockPos.getY(q), BlockPos.getZ(q), false);
-                if (cur == null || cur.isAir() || cur == ns) continue;
-                if (!StateRules.derivedEquivalent(ns, cur)) continue;   // 파생 블록 사이의 변화만
-                if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue;
-                cells.put(q, ns);
+
+            // 3) 이웃 반응 연쇄: 바뀐 칸의 이웃이 모양을 다시 맞추고(updateShape) 이웃 변화에 반응(neighborChanged)한다
+            int checks = 0;
+            for (int round = 0; round < MAX_ROUNDS && !frontier.isEmpty() && checks < MAX_NEIGHBOR_CHECKS; round++) {
+                it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet next = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
+                BlockPos.MutableBlockPos np = new BlockPos.MutableBlockPos();
+                for (long p : frontier.toLongArray()) {
+                    BlockPos pos = BlockPos.of(p);
+                    BlockState from = sim.read(p);
+                    for (Direction d : Direction.values()) {
+                        if (++checks > MAX_NEIGHBOR_CHECKS) break;
+                        np.setWithOffset(pos, d);
+                        long q = np.asLong();
+                        if (!s.model.isInside(q)) continue;
+                        BlockState cur = sim.read(q);
+                        if (cur.isAir()) continue;
+                        if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue; // 편집 중인 층의 설계 칸만 고친다
+                        BlockPos nq = np.immutable();
+                        BlockState shaped = cur;
+                        try {
+                            shaped = cur.updateShape(d.getOpposite(), from, lv, nq, pos);
+                        } catch (Throwable ignored) {
+                        }
+                        if (acceptable(cur, shaped)) {
+                            cells.put(q, shaped);
+                            next.add(q);
+                        }
+                        BlockState now = sim.read(q);
+                        sim.recording = true;
+                        react(now, () -> now.handleNeighborChanged(server, nq, from.getBlock(), pos, false),
+                                () -> now.handleNeighborChanged(lv, nq, from.getBlock(), pos, false));
+                        sim.recording = false;
+                        acceptWrites(s, sim, cells, structureLayer, next);
+                    }
+                }
+                frontier = next;
             }
-            sim.writes.clear(); // 받아들인 변화는 cells 에 있다. 버린 변화가 다음 판정에 비치지 않게
-            // 3) 둘레 2칸의 파생 블록이 아직 조건을 만족하는지 (증기기관을 치우면 동력 축 → 축: Create 는 서버 틱에서 되돌린다)
+
+            // 4) 예약 틱이 걸린 칸 + 둘레 2칸의 파생 블록: 다시 설치해 보아 조건이 깨졌으면 되돌린다
+            //    (Create 증기기관을 치우면 동력 축 → 축: 원래는 서버 틱에서 되돌린다)
+            it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet recheck = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet(sim.ticked);
             if (keys.length <= REVALIDATE_MAX) {
-                it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
                 for (long p : keys) {
                     BlockPos pos = BlockPos.of(p);
                     for (Direction d : Direction.values()) {
-                        for (int k = 1; k <= 2; k++) {
-                            long q = pos.relative(d, k).asLong();
-                            if (!seen.add(q) || !s.model.isInside(q)) continue;
-                            BlockState cur = sim.read(q);
-                            if (cur.isAir() || cur.getBlock().asItem() != net.minecraft.world.item.Items.AIR) continue; // 파생 블록만
-                            if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue;
-                            BlockState alt = placeInContext(lv, sim, q, cur);
-                            if (alt != null && alt.getBlock() != cur.getBlock() && StateRules.derivedEquivalent(alt, cur)) {
-                                cells.put(q, copyShared(cur, alt));
-                            }
-                        }
+                        for (int k = 1; k <= 2; k++) recheck.add(pos.relative(d, k).asLong());
                     }
+                }
+            }
+            for (long q : recheck.toLongArray()) {
+                if (!s.model.isInside(q)) continue;
+                BlockState cur = sim.read(q);
+                if (cur.isAir()) continue;
+                boolean derived = cur.getBlock().asItem() == net.minecraft.world.item.Items.AIR;
+                if (!derived && !sim.ticked.contains(q)) continue; // 둘레 칸은 파생 블록만, 예약 틱 칸은 모두
+                if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue;
+                BlockState alt = placeInContext(lv, sim, q, cur);
+                if (alt != null && alt.getBlock() != cur.getBlock() && StateRules.derivedEquivalent(alt, cur)) {
+                    cells.put(q, copyShared(cur, alt));
                 }
             }
         } catch (Throwable ignored) {
         } finally {
             sim.recording = false;
             sim.writes.clear();
+            sim.ticked.clear();
             sim.cells = null;
             sim.s = null;
         }
     }
+
+    /** 받아들일 변화: 같은 블록의 상태 변화(연결 모양 등) 또는 파생 블록 사이의 변화. 다른 블록이 되거나 사라지는 건 버린다. */
+    private static boolean acceptable(BlockState cur, BlockState ns) {
+        if (ns == null || ns == cur || ns.isAir()) return false;
+        return ns.getBlock() == cur.getBlock() || StateRules.derivedEquivalent(ns, cur);
+    }
+
+    /** 반응이 쓴 변화를 받아들인다 (편집 층 설계 칸 + 이번에 놓는 칸만). 받아들인 칸은 changed 에 더한다. */
+    private static void acceptWrites(EditorSession s, Sim sim, Long2ObjectLinkedOpenHashMap<BlockState> cells, boolean structureLayer,
+                                     it.unimi.dsi.fastutil.longs.LongSet changed) {
+        if (sim.writes.isEmpty()) return;
+        for (var e : sim.writes.long2ObjectEntrySet()) {
+            long q = e.getLongKey();
+            if (!s.model.isInside(q)) continue;
+            BlockState cur = cells.containsKey(q) ? cells.get(q) : s.blockAt(BlockPos.getX(q), BlockPos.getY(q), BlockPos.getZ(q), false);
+            if (cur == null || cur.isAir() || !acceptable(cur, e.getValue())) continue;
+            if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue;
+            cells.put(q, e.getValue());
+            changed.add(q);
+        }
+        sim.writes.clear(); // 버린 변화가 다음 판정에 비치지 않게
+    }
+
+    /** 반응을 서버인 척 하는 월드에서 먼저 돌리고, 실패하면 클라이언트 월드로 다시. 둘 다 실패하면 반응 없음. */
+    private static void react(BlockState st, Runnable serverSide, Runnable clientSide) {
+        net.minecraft.world.level.block.Block b = st.getBlock();
+        if (FAILS_BOTH.contains(b)) return;
+        if (!FAILS_SERVER.contains(b)) {
+            try {
+                serverSide.run();
+                return;
+            } catch (Throwable t) {
+                SIM.writes.clear();
+                FAILS_SERVER.add(b); // 다음부터는 바로 클라이언트로 (예외는 비싸다: 미리보기는 매 프레임 돈다)
+            }
+        }
+        try {
+            clientSide.run();
+        } catch (Throwable t) {
+            SIM.writes.clear();
+            FAILS_BOTH.add(b);
+        }
+    }
+
+    private static final java.util.Set<net.minecraft.world.level.block.Block> FAILS_SERVER = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final java.util.Set<net.minecraft.world.level.block.Block> FAILS_BOTH = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /** 이웃 칸이 지금 편집 중인 층(지형 / 선택 구조물)의 설계 칸인가. */
     private static boolean sameLayer(EditorSession s, long q, boolean structureLayer) {

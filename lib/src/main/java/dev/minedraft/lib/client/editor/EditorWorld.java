@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
  * hideCut 이면 층 자르기로 숨긴 블록을 공기로 본다 (잘린 단면이 그려지고, 커서가 통과한다).
  * 조명은 항상 최대 밝기, 면 음영은 바닐라와 같다.
  */
-public final class EditorWorld implements BlockAndTintGetter {
+public final class EditorWorld implements BlockAndTintGetter, dev.minedraft.lib.client.render.CellExtras {
     private final AreaEditorSession session;
     private final boolean hideCut;
 
@@ -45,6 +45,20 @@ public final class EditorWorld implements BlockAndTintGetter {
     public BlockEntity getBlockEntity(BlockPos pos) {
         // 보이는 칸만 (단면에 잘린 칸은 공기로 보이므로 블록 엔티티도 없다)
         return getBlockState(pos).hasBlockEntity() ? session.blockEntities.get(pos) : null;
+    }
+
+    /**
+     * Off-grid 칸: 그 칸이 월드 사본 그대로 보일 때만 (설계가 덮었거나 단면에 잘린 칸은 없음).
+     */
+    @Nullable
+    @Override
+    public Extras extras(BlockPos pos) {
+        int x = pos.getX(), y = pos.getY(), z = pos.getZ();
+        Extras ex = session.snapshot.offgrid(x, y, z);
+        if (ex == null) return null;
+        if (hideCut && session.cutActive && session.isCut(x, y, z)) return null;
+        if (getBlockState(pos) != session.snapshot.get(x, y, z)) return null;
+        return ex;
     }
 
     /** 블록 엔티티가 주는 모델 데이터 (연결 텍스처, 보일러 외장 등). */

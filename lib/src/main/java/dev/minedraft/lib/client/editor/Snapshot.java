@@ -53,6 +53,8 @@ public final class Snapshot {
         final int[] heights = new int[256];
         /** 블록 엔티티 동기화 데이터 (칸 → update tag). */
         final Long2ObjectOpenHashMap<CompoundTag> blockEntities = new Long2ObjectOpenHashMap<>();
+        /** Off-grid 칸 (겹친 블록·기준 블록 이동값). */
+        final Long2ObjectOpenHashMap<dev.minedraft.lib.client.render.CellExtras.Extras> offgrid = new Long2ObjectOpenHashMap<>();
 
         ChunkData(int minSection, Section[] sections, Holder<Biome>[] biomePalette, byte[][] biomes) {
             this.minSection = minSection;
@@ -123,6 +125,25 @@ public final class Snapshot {
             CompoundTag t = buf.readNbt();
             if (t != null) data.blockEntities.put(p, t);
         }
+        if (buf.isReadable()) {
+            int nog = buf.readVarInt();
+            for (int i = 0; i < nog; i++) {
+                long p = buf.readLong();
+                float hx = buf.readFloat(), hy = buf.readFloat(), hz = buf.readFloat();
+                int n = buf.readVarInt();
+                BlockState[] states = new BlockState[n];
+                float[] offs = new float[n * 3];
+                CompoundTag[] tags = new CompoundTag[n];
+                for (int k = 0; k < n; k++) {
+                    states[k] = Block.stateById(buf.readVarInt());
+                    offs[k * 3] = buf.readFloat();
+                    offs[k * 3 + 1] = buf.readFloat();
+                    offs[k * 3 + 2] = buf.readFloat();
+                    tags[k] = buf.readNbt();
+                }
+                data.offgrid.put(p, new dev.minedraft.lib.client.render.CellExtras.Extras(hx, hy, hz, states, offs, tags));
+            }
+        }
         int minY = minSection << 4;
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
@@ -154,6 +175,13 @@ public final class Snapshot {
         lastKey = key;
         lastChunk = c;
         return c;
+    }
+
+    /** 월드 사본의 Off-grid 칸 (없으면 null). */
+    @Nullable
+    public dev.minedraft.lib.client.render.CellExtras.Extras offgrid(int x, int y, int z) {
+        ChunkData c = chunk(x, z);
+        return c == null || c.offgrid.isEmpty() ? null : c.offgrid.get(BlockPos.asLong(x, y, z));
     }
 
     /** 월드 사본의 블록 엔티티 동기화 데이터 (없으면 null). */

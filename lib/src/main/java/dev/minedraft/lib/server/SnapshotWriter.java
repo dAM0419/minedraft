@@ -37,6 +37,9 @@ public final class SnapshotWriter {
     /** 청크당 보내는 블록 엔티티 수와 하나의 데이터 크기 상한 (넘으면 빈 데이터 = 기본 모습). */
     private static final int MAX_BE_PER_CHUNK = 4096, MAX_BE_BYTES = 32 * 1024;
 
+    /** Off-grid: 청크당 칸 수, 칸당 겹친 블록 수 상한. */
+    private static final int MAX_OFFGRID_CELLS = 8192, MAX_OFFGRID_EXTRAS = 16;
+
     public static byte[] encode(ServerLevel level, UUID blueprint, long chunkLong) {
         int cx = ChunkPos.getX(chunkLong), cz = ChunkPos.getZ(chunkLong);
         LevelChunk chunk = level.getChunk(cx, cz);
@@ -128,6 +131,30 @@ public final class SnapshotWriter {
             for (Map.Entry<BlockPos, CompoundTag> e : bes) {
                 buf.writeLong(e.getKey().asLong());
                 buf.writeNbt(e.getValue());
+            }
+            // Off-grid 칸 (겹친 블록·칸 안 이동값). Off-grid 가 없으면 0 칸
+            List<Map.Entry<Long, dev.minedraft.lib.compat.OffgridCompat.CellData>> og = new ArrayList<>();
+            dev.minedraft.lib.compat.OffgridCompat.forEachCell(level, cx, cz, (p, cell) -> {
+                if (og.size() < MAX_OFFGRID_CELLS) og.add(Map.entry(p, cell));
+            });
+            buf.writeVarInt(og.size());
+            for (Map.Entry<Long, dev.minedraft.lib.compat.OffgridCompat.CellData> e : og) {
+                var cell = e.getValue();
+                buf.writeLong(e.getKey());
+                buf.writeFloat(cell.ox());
+                buf.writeFloat(cell.oy());
+                buf.writeFloat(cell.oz());
+                int n = Math.min(cell.extras().size(), MAX_OFFGRID_EXTRAS);
+                buf.writeVarInt(n);
+                for (int k = 0; k < n; k++) {
+                    var x = cell.extras().get(k);
+                    buf.writeVarInt(net.minecraft.world.level.block.Block.getId(x.state()));
+                    buf.writeFloat(x.ox());
+                    buf.writeFloat(x.oy());
+                    buf.writeFloat(x.oz());
+                    CompoundTag t = x.tag();
+                    buf.writeNbt(t == null || t.sizeInBytes() > MAX_BE_BYTES ? new CompoundTag() : t);
+                }
             }
         });
     }
