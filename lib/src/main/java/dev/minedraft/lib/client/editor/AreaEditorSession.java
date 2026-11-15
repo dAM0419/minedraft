@@ -452,17 +452,7 @@ public abstract class AreaEditorSession implements ClientEditor {
     /** 영역 안 가장 높은 블록 (층 슬라이더 범위). */
     public int topY() {
         if (topYRevision == area.revision() && topYCache != Integer.MIN_VALUE) return topYCache;
-        int top = renderMinY;
-        LongIterator it = area.chunks().iterator();
-        while (it.hasNext()) {
-            long c = it.nextLong();
-            int cx = ChunkPos.getX(c), cz = ChunkPos.getZ(c);
-            for (int x = 0; x < 16; x += 2) {
-                for (int z = 0; z < 16; z += 2) {
-                    top = Math.max(top, snapshot.surface((cx << 4) + x, (cz << 4) + z));
-                }
-            }
-        }
+        int top = Math.max(renderMinY, surfaceMax());
         top = Math.max(top, highestDesignY());
         topYCache = Math.min(area.maxY - 1, top + 2);
         topYRevision = area.revision();
@@ -473,6 +463,42 @@ public abstract class AreaEditorSession implements ClientEditor {
     private int topYCache = Integer.MIN_VALUE;
 
     private long topYRevision = -1;
+
+    // ---- 지면 높이 표본 (월드 사본·청크가 바뀔 때만 다시 센다. 설계 편집마다 세지 않는다) ----
+    private long surfaceStamp;
+    private long surfaceStatsStamp = -1;
+    private int surfaceMin = Integer.MAX_VALUE, surfaceMax = Integer.MIN_VALUE;
+
+    private void surfaceChanged() {
+        surfaceStamp++;
+        topYCache = Integer.MIN_VALUE;
+    }
+
+    private void sampleSurface() {
+        if (surfaceStatsStamp == surfaceStamp) return;
+        surfaceStatsStamp = surfaceStamp;
+        int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE;
+        LongIterator it = area.chunks().iterator();
+        while (it.hasNext()) {
+            long c = it.nextLong();
+            int cx = ChunkPos.getX(c), cz = ChunkPos.getZ(c);
+            for (int x = 0; x < 16; x += 2) {
+                for (int z = 0; z < 16; z += 2) {
+                    int h = snapshot.surface((cx << 4) + x, (cz << 4) + z);
+                    if (h == Integer.MIN_VALUE) continue;
+                    if (h < min) min = h;
+                    if (h > max) max = h;
+                }
+            }
+        }
+        surfaceMin = min;
+        surfaceMax = max;
+    }
+
+    private int surfaceMax() {
+        sampleSurface();
+        return surfaceMax;
+    }
 
 
     /** 자르기 범위: 선택된 구조물이 있으면 그 볼륨, 없으면 영역 전체. */
@@ -614,6 +640,7 @@ public abstract class AreaEditorSession implements ClientEditor {
 
     public void onSnapshotChunk(long chunk) {
         blockEntities.invalidateChunk(chunk);
+        surfaceChanged();
         if (ready && renderer != null) {
             computeRenderMinY();
             renderer.markChunkArea(chunk);
@@ -632,18 +659,8 @@ public abstract class AreaEditorSession implements ClientEditor {
 
 
     private void computeRenderMinY() {
-        int minSurface = Integer.MAX_VALUE;
-        LongIterator it = area.chunks().iterator();
-        while (it.hasNext()) {
-            long c = it.nextLong();
-            int cx = ChunkPos.getX(c), cz = ChunkPos.getZ(c);
-            for (int x = 0; x < 16; x += 3) {
-                for (int z = 0; z < 16; z += 3) {
-                    int s = snapshot.surface((cx << 4) + x, (cz << 4) + z);
-                    if (s != Integer.MIN_VALUE) minSurface = Math.min(minSurface, s);
-                }
-            }
-        }
+        sampleSurface();
+        int minSurface = surfaceMin;
         if (minSurface == Integer.MAX_VALUE) minSurface = 60;
         int min = minSurface - 12;
         int lowestDesign = lowestDesignY();
@@ -781,6 +798,7 @@ public abstract class AreaEditorSession implements ClientEditor {
         for (AreaOp op : ops) {
             if (op instanceof AreaOps.ChunkAdd || op instanceof AreaOps.ChunkRemove) {
                 long c = op instanceof AreaOps.ChunkAdd a ? a.chunk() : ((AreaOps.ChunkRemove) op).chunk();
+                surfaceChanged();
                 if (op instanceof AreaOps.ChunkRemove) {
                     snapshot.remove(c);
                     blockEntities.invalidateChunk(c);

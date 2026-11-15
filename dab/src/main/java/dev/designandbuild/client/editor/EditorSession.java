@@ -276,16 +276,12 @@ public final class EditorSession extends AreaEditorSession {
 
     @Override
     protected int lowestDesignY() {
-        int min = Integer.MAX_VALUE;
-        for (long p : model.resolvedMap().keySet()) min = Math.min(min, BlockPos.getY(p));
-        return min;
+        return model.lowestY();
     }
 
     @Override
     protected int highestDesignY() {
-        int max = Integer.MIN_VALUE;
-        for (long p : model.resolvedMap().keySet()) max = Math.max(max, BlockPos.getY(p));
-        return max;
+        return model.highestY();
     }
 
     @Override

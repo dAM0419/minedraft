@@ -93,6 +93,9 @@ public final class BlueprintModel implements AreaLayer {
     private final Int2IntOpenHashMap orderIndex = new Int2IntOpenHashMap();
     private final LongOpenHashSet pending = new LongOpenHashSet();
 
+    /** 높이별 설계 칸 수 (가장 낮은·높은 설계 칸을 전체를 훑지 않고 찾는다). 칸 y - minY 번째. */
+    private final int[] cellsAtY;
+
     private long conflictCacheRevision = -1;
     private final Int2IntOpenHashMap conflictCache = new Int2IntOpenHashMap();
 
@@ -104,6 +107,7 @@ public final class BlueprintModel implements AreaLayer {
         this.baseZ = area.baseZ;
         this.minY = area.minY;
         this.maxY = area.maxY;
+        this.cellsAtY = new int[Math.max(1, area.maxY - area.minY)];
         this.orderIndex.defaultReturnValue(Integer.MAX_VALUE);
         // 지형 칸의 바닥/길 태그는 Lib 공간 태그 층이 원본: 그쪽에서 바뀌면 (공간 지정 도구·되돌리기) 여기 사본을 맞춘다
         this.tags = area.layer(SpaceTagLayer.KEY);
@@ -439,6 +443,7 @@ public final class BlueprintModel implements AreaLayer {
         }
         posIndex.clear();
         resolved.clear();
+        java.util.Arrays.fill(cellsAtY, 0);
         rebuildOrderIndex();
         for (StructureInstance s : structures.values()) {
             for (long p : s.blocks.keySet()) addIndex(p, s.id);
@@ -505,10 +510,27 @@ public final class BlueprintModel implements AreaLayer {
             }
         }
         if (state == null) {
-            resolved.remove(pos);
+            if (resolved.remove(pos) != null) countY(pos, -1);
         } else {
-            resolved.put(pos, new Resolved(state, tag == null ? DesignTag.NONE : tag, owner, conflict));
+            if (resolved.put(pos, new Resolved(state, tag == null ? DesignTag.NONE : tag, owner, conflict)) == null) countY(pos, 1);
         }
+    }
+
+    private void countY(long pos, int d) {
+        int i = BlockPos.getY(pos) - minY;
+        if (i >= 0 && i < cellsAtY.length) cellsAtY[i] += d;
+    }
+
+    /** 가장 낮은 설계 칸 높이 (없으면 Integer.MAX_VALUE). */
+    public int lowestY() {
+        for (int i = 0; i < cellsAtY.length; i++) if (cellsAtY[i] > 0) return minY + i;
+        return Integer.MAX_VALUE;
+    }
+
+    /** 가장 높은 설계 칸 높이 (없으면 Integer.MIN_VALUE). */
+    public int highestY() {
+        for (int i = cellsAtY.length - 1; i >= 0; i--) if (cellsAtY[i] > 0) return minY + i;
+        return Integer.MIN_VALUE;
     }
 
     private void addIndex(long pos, int sid) {

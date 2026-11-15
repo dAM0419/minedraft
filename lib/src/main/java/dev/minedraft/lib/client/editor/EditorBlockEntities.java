@@ -1,10 +1,8 @@
 package dev.minedraft.lib.client.editor;
 
 import com.mojang.logging.LogUtils;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -27,8 +25,36 @@ public final class EditorBlockEntities {
     private static final Logger LOG = LogUtils.getLogger();
 
     private final AreaEditorSession session;
-    private final Long2ObjectOpenHashMap<BlockEntity> map = new Long2ObjectOpenHashMap<>();
-    private final LongOpenHashSet failed = new LongOpenHashSet();
+    /** 청크별로 나눠 둔다: 청크 사본이 새로 오면 그 청크 것만 버린다 (전체를 훑지 않는다). */
+    private final Long2ObjectOpenHashMap<Long2ObjectOpenHashMap<BlockEntity>> byChunk = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectOpenHashMap<LongOpenHashSet> failedByChunk = new Long2ObjectOpenHashMap<>();
+    private int size;
+
+    private static long chunkOf(long pos) {
+        return ChunkPos.asLong(BlockPos.getX(pos) >> 4, BlockPos.getZ(pos) >> 4);
+    }
+
+    private void remove(long key) {
+        Long2ObjectOpenHashMap<BlockEntity> m = byChunk.get(chunkOf(key));
+        if (m != null && m.remove(key) != null) size--;
+    }
+
+    private boolean isFailed(long key) {
+        LongOpenHashSet f = failedByChunk.get(chunkOf(key));
+        return f != null && f.contains(key);
+    }
+
+    private void unfail(long key) {
+        LongOpenHashSet f = failedByChunk.get(chunkOf(key));
+        if (f != null) f.remove(key);
+    }
+
+    /** 이미 만들어 둔 블록 엔티티 (새로 만들지 않는다). */
+    @Nullable
+    public BlockEntity peek(long key) {
+        Long2ObjectOpenHashMap<BlockEntity> m = byChunk.get(chunkOf(key));
+        return m == null ? null : m.get(key);
+    }
     @Nullable
     private EditorLevel level;
     private boolean levelFailed;
@@ -64,25 +90,26 @@ public final class EditorBlockEntities {
         long key = pos.asLong();
         BlockState state = session.blockAt(pos.getX(), pos.getY(), pos.getZ(), false);
         if (!state.hasBlockEntity()) {
-            if (!map.isEmpty()) map.remove(key);
+            if (size > 0) remove(key);
             return null;
         }
-        BlockEntity be = map.get(key);
+        BlockEntity be = peek(key);
         if (be != null) {
             if (be.getBlockState().getBlock() == state.getBlock()) {
                 if (be.getBlockState() != state) be.setBlockState(state);
                 return be;
             }
-            map.remove(key);
-            failed.remove(key);
+            remove(key);
+            unfail(key);
         }
-        if (failed.contains(key)) return null;
+        if (isFailed(key)) return null;
         be = create(pos.immutable(), state);
+        long chunk = chunkOf(key);
         if (be == null) {
-            failed.add(key);
+            failedByChunk.computeIfAbsent(chunk, c -> new LongOpenHashSet()).add(key);
             return null;
         }
-        map.put(key, be);
+        if (byChunk.computeIfAbsent(chunk, c -> new Long2ObjectOpenHashMap<>()).put(key, be) == null) size++;
         return be;
     }
 
@@ -108,32 +135,29 @@ public final class EditorBlockEntities {
 
     /** 칸이 바뀌었다 (다음에 찾을 때 다시 만든다). */
     public void invalidate(long pos) {
-        map.remove(pos);
-        failed.remove(pos);
+        remove(pos);
+        unfail(pos);
     }
 
     /** 청크의 월드 사본이 새로 왔거나 빠졌다. */
     public void invalidateChunk(long chunk) {
-        int cx = ChunkPos.getX(chunk), cz = ChunkPos.getZ(chunk);
-        ObjectIterator<Long2ObjectMap.Entry<BlockEntity>> it = map.long2ObjectEntrySet().iterator();
-        while (it.hasNext()) {
-            long p = it.next().getLongKey();
-            if (BlockPos.getX(p) >> 4 == cx && BlockPos.getZ(p) >> 4 == cz) it.remove();
-        }
-        failed.removeIf(p -> BlockPos.getX(p) >> 4 == cx && BlockPos.getZ(p) >> 4 == cz);
+        Long2ObjectOpenHashMap<BlockEntity> m = byChunk.remove(chunk);
+        if (m != null) size -= m.size();
+        failedByChunk.remove(chunk);
     }
 
     /** 만들어 둔 블록 엔티티 전부 (그린 섹션의 블록 엔티티는 메싱 때 만들어진다). */
     public void forEach(Consumer<BlockEntity> out) {
-        for (BlockEntity be : map.values()) out.accept(be);
+        for (Long2ObjectOpenHashMap<BlockEntity> m : byChunk.values()) for (BlockEntity be : m.values()) out.accept(be);
     }
 
     public int size() {
-        return map.size();
+        return size;
     }
 
     public void clear() {
-        map.clear();
-        failed.clear();
+        byChunk.clear();
+        failedByChunk.clear();
+        size = 0;
     }
 }

@@ -435,35 +435,40 @@ public final class EditorRenderer implements AutoCloseable {
         com.mojang.blaze3d.platform.Lighting.setupLevel();
         // 1) 블록 엔티티 렌더러
         LongOpenHashSet drawn = new LongOpenHashSet();
-        int[] n = {0};
-        s.blockEntities.forEach(be -> {
-            if (n[0] >= MAX_BLOCK_ENTITIES) return;
-            BlockPos bp = be.getBlockPos();
-            long key = bp.asLong();
-            if (berFailed.contains(key)) return;
-            int x = bp.getX(), y = bp.getY(), z = bp.getZ();
-            boolean cut = s.cutActive && s.isCut(x, y, z);
-            if ((pass == Pass.LOWER && cut) || (pass == Pass.UPPER && !cut)) return;
-            if (s.visibleAt(x, y, z, false).getBlock() != be.getBlockState().getBlock()) return;
-            net.minecraft.client.renderer.blockentity.BlockEntityRenderer<net.minecraft.world.level.block.entity.BlockEntity> r =
-                    dispatcher.getRenderer(be);
-            if (r == null) return;
-            pose.pushPose();
-            pose.translate(x - s.camera.tx, y - s.camera.ty, z - s.camera.tz);
-            try {
-                r.render(be, pt, pose, buffers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-                drawn.add(key);
-                n[0]++;
-            } catch (Throwable t) {
-                // 이 월드 밖에서 그릴 수 없는 렌더러: 이 칸은 다시 그리지 않는다 (모델·아이템 모양으로만)
-                berFailed.add(key);
+        // 보이는 섹션의 블록 엔티티만 (메싱 때 적어 둔 칸)
+        int n = 0;
+        outer:
+        for (BlockMesher.Mesh m : meshes) {
+            for (long key : m.entities) {
+                if (n >= MAX_BLOCK_ENTITIES) break outer;
+                if (berFailed.contains(key)) continue;
+                net.minecraft.world.level.block.entity.BlockEntity be = s.blockEntities.peek(key);
+                if (be == null) be = s.blockEntities.get(BlockPos.of(key)); // 메싱 뒤 청크 사본이 새로 와 버려졌을 때
+                if (be == null) continue;
+                int x = BlockPos.getX(key), y = BlockPos.getY(key), z = BlockPos.getZ(key);
+                boolean cut = s.cutActive && s.isCut(x, y, z);
+                if ((pass == Pass.LOWER && cut) || (pass == Pass.UPPER && !cut)) continue;
+                if (s.visibleAt(x, y, z, false).getBlock() != be.getBlockState().getBlock()) continue;
+                net.minecraft.client.renderer.blockentity.BlockEntityRenderer<net.minecraft.world.level.block.entity.BlockEntity> r =
+                        dispatcher.getRenderer(be);
+                if (r == null) continue;
+                pose.pushPose();
+                pose.translate(x - s.camera.tx, y - s.camera.ty, z - s.camera.tz);
                 try {
-                    buffers.endBatch();
-                } catch (Throwable ignored) {
+                    r.render(be, pt, pose, buffers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+                    drawn.add(key);
+                    n++;
+                } catch (Throwable t) {
+                    // 이 월드 밖에서 그릴 수 없는 렌더러: 이 칸은 다시 그리지 않는다 (모델·아이템 모양으로만)
+                    berFailed.add(key);
+                    try {
+                        buffers.endBatch();
+                    } catch (Throwable ignored) {
+                    }
                 }
+                pose.popPose();
             }
-            pose.popPose();
-        });
+        }
         // 2) 렌더러가 없는 블록 엔티티 모양 블록: 아이템 모델
         int count = 0;
         for (BlockMesher.Mesh m : meshes) count += m.dynamic.length;

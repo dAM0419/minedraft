@@ -64,6 +64,8 @@ public final class BlockMesher {
     public static final class Mesh implements AutoCloseable {
         public final VertexBuffer[] buffers = new VertexBuffer[LAYER_COUNT];
         public long[] dynamic = new long[0];
+        /** 블록 엔티티가 있는 칸 (편집창이 보이는 섹션의 블록 엔티티 렌더러만 그리게). */
+        public long[] entities = new long[0];
 
         public boolean hasLayer(int layer) {
             return buffers[layer] != null;
@@ -71,7 +73,7 @@ public final class BlockMesher {
 
         public boolean isEmpty() {
             for (VertexBuffer b : buffers) if (b != null) return false;
-            return dynamic.length == 0;
+            return dynamic.length == 0 && entities.length == 0;
         }
 
         @Override
@@ -102,6 +104,7 @@ public final class BlockMesher {
         BlockRenderDispatcher dispatcher = Minecraft.getInstance().getBlockRenderer();
         ModelBlockRenderer renderer = dispatcher.getModelRenderer();
         LongArrayList dynamic = new LongArrayList();
+        LongArrayList entities = new LongArrayList();
         ModelBlockRenderer.enableCaching();
         try {
             while (positions.hasNext()) {
@@ -117,7 +120,7 @@ public final class BlockMesher {
                         dispatcher.renderLiquid(pos, level, fluidWrapper, state, fluid);
                     }
                     // 블록 엔티티가 있는 블록: 여기서 한 번 찾아 두면 편집창이 블록 엔티티를 만들어 렌더러로 그린다
-                    if (state.hasBlockEntity()) level.getBlockEntity(pos);
+                    if (state.hasBlockEntity() && level.getBlockEntity(pos) != null) entities.add(pos.asLong());
                     RenderShape shape = state.getRenderShape();
                     if (shape == RenderShape.ENTITYBLOCK_ANIMATED) {
                         dynamic.add(pos.asLong());
@@ -159,6 +162,7 @@ public final class BlockMesher {
             mesh.buffers[i] = vb;
         }
         mesh.dynamic = dynamic.toLongArray();
+        mesh.entities = entities.toLongArray();
         return mesh;
     }
 

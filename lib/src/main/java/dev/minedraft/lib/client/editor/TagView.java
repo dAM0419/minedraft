@@ -24,6 +24,9 @@ public final class TagView {
     private static VertexBuffer buffer;
     private static long key = Long.MIN_VALUE;
     private static int ox, oy, oz;
+    /** 칠하는 중처럼 잇달아 바뀔 때 다시 굽는 최소 간격 (밀리초). 그 사이엔 앞서 구운 것을 그린다. */
+    private static final long REBAKE_MS = 150;
+    private static long bakedAt;
 
     /** 편집창을 닫을 때: 버퍼를 버린다 (다음 편집창의 다른 영역과 섞이지 않게). */
     public static void release() {
@@ -34,8 +37,11 @@ public final class TagView {
 
     static void draw(AreaEditorSession s, Matrix4f rot, Matrix4f proj) {
         long k = s.tagViewKey();
-        if (k != key || buffer == null) {
+        long now = System.currentTimeMillis();
+        if (buffer == null && key == k) return; // 덮을 칸이 없었다
+        if (k != key && (buffer == null || now - bakedAt >= REBAKE_MS)) {
             key = k;
+            bakedAt = now;
             if (buffer != null) buffer.close();
             buffer = null;
             Box a = s.area.areaBounds();
