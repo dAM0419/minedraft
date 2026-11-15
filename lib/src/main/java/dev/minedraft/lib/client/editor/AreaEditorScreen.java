@@ -539,9 +539,13 @@ public abstract class AreaEditorScreen extends Screen {
 
     /** 커서 설명: 공간 지정 도구면 Lib 이, 아니면 모드가. */
     /** 뷰포트 렌더러용: 범위 손잡이를 그리고, 붓을 숨길지 알려 준다. */
-    final void drawRangeHandles(com.mojang.blaze3d.vertex.VertexConsumer lines, com.mojang.blaze3d.vertex.PoseStack ps,
-                                double tx, double ty, double tz) {
-        rangeHandles.draw(lines, ps, tx, ty, tz);
+    final void drawRangeBox(com.mojang.blaze3d.vertex.VertexConsumer lines, com.mojang.blaze3d.vertex.PoseStack ps,
+                            double tx, double ty, double tz, int alpha) {
+        rangeHandles.drawBox(lines, ps, tx, ty, tz, alpha);
+    }
+
+    final void drawRangeArrows(GuiGraphics g) {
+        rangeHandles.drawArrows(g);
     }
 
     final boolean rangeBrushVisible() {

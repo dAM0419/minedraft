@@ -84,6 +84,12 @@ public final class EditorScreen extends AreaEditorScreen {
     private Vec3 moveStart;
     private double movePlane;
     private Direction.Axis moveAxis = Direction.Axis.Y;
+    /** Shift 를 누른 채 끄는 중: 위아래로만. 바뀔 때마다 그 자리에서 기준점을 다시 잡아 튀지 않게 한다. */
+    private boolean moveVertical;
+    private Direction.Axis dragAxis;
+    private double dragPlane;
+    private Vec3 dragStart;
+    private int baseDX, baseDY, baseDZ;
     @Nullable
     public LibraryEntry libraryDrag;
     private int[] cycleIds = new int[0];
@@ -336,7 +342,7 @@ public final class EditorScreen extends AreaEditorScreen {
                         {"Shift+minedraftlib.key.mmb", "designandbuild.help.eyedropper_palette"}},
                 {{"designandbuild.help.structures"}, {"Alt+minedraftlib.key.lmb", "designandbuild.help.alt_select"},
                         {"R", "designandbuild.help.rotate"}, {"F", "designandbuild.help.mirror"},
-                        {"PgUp / PgDn", "designandbuild.help.updown"}, {"Del", "designandbuild.select.delete"},
+                        {"Shift+minedraftlib.key.lmb_drag", "designandbuild.help.drag_vertical"}, {"PgUp / PgDn", "designandbuild.help.updown"}, {"Del", "designandbuild.select.delete"},
                         {"minedraftlib.key.rmb", "designandbuild.help.cancel_place"}},
                 helpGeneral()};
     }
@@ -689,6 +695,32 @@ public final class EditorScreen extends AreaEditorScreen {
         movePlane = h.face().getAxis() == moveAxis
                 ? c + (h.face().getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1 : 0) : c + 0.5;
         moveStart = s.camera.planePoint(mouseX(), mouseY(), moveAxis, movePlane);
+        moveVertical = false;
+        dragAxis = moveAxis;
+        dragPlane = movePlane;
+        dragStart = moveStart;
+        baseDX = baseDY = baseDZ = 0;
+    }
+
+    /** 끄는 방식(평면 / 위아래만)을 바꿨다: 지금 옮긴 양을 기준으로 새 평면에서 다시 잡는다. */
+    private void reanchorMove(boolean vertical, double mx, double my) {
+        moveVertical = vertical;
+        baseDX = moveDX;
+        baseDY = moveDY;
+        baseDZ = moveDZ;
+        if (vertical) {
+            // 카메라를 마주 보는 세로 평면 (구조물 가운데를 지나게)
+            org.joml.Vector3f c = s.camera.toCamera();
+            dragAxis = Math.abs(c.x) >= Math.abs(c.z) ? Direction.Axis.X : Direction.Axis.Z;
+            StructureInstance st = s.model.structure(s.selected);
+            Box b = st == null ? null : st.bounds();
+            dragPlane = b == null ? (dragAxis == Direction.Axis.X ? s.camera.tx : s.camera.tz)
+                    : (dragAxis == Direction.Axis.X ? (b.minX() + b.maxX() + 1) / 2.0 + moveDX : (b.minZ() + b.maxZ() + 1) / 2.0 + moveDZ);
+        } else {
+            dragAxis = moveAxis;
+            dragPlane = movePlane;
+        }
+        dragStart = s.camera.planePoint(mx, my, dragAxis, dragPlane);
     }
 
     /** 1~4: 배치 도구면 배치 방식, 아니면 직접조작 방식. */
@@ -795,12 +827,21 @@ public final class EditorScreen extends AreaEditorScreen {
     @Override
     protected void viewportDragged(double mx, double my, int button) {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && moving && moveStart != null) {
-            Vec3 now = s.camera.planePoint(mx, my, moveAxis, movePlane);
+            boolean vertical = hasShiftDown();
+            if (vertical != moveVertical || dragStart == null) reanchorMove(vertical, mx, my);
+            Vec3 now = dragStart == null ? null : s.camera.planePoint(mx, my, dragAxis, dragPlane);
             if (now != null) {
-                // 평면 안의 두 축으로 옮긴다 (정면에서 보면 위아래로도). 나머지 축은 PgUp/PgDn 과 같이 따로
-                if (moveAxis != Direction.Axis.X) moveDX = (int) Math.round(now.x - moveStart.x);
-                if (moveAxis != Direction.Axis.Y) moveDY = (int) Math.round(now.y - moveStart.y);
-                if (moveAxis != Direction.Axis.Z) moveDZ = (int) Math.round(now.z - moveStart.z);
+                if (moveVertical) {
+                    // Shift: 위아래로만
+                    moveDX = baseDX;
+                    moveDZ = baseDZ;
+                    moveDY = baseDY + (int) Math.round(now.y - dragStart.y);
+                } else {
+                    // 평면 안의 두 축으로 옮긴다 (정면에서 보면 위아래로도). 나머지 축은 Shift 끌기나 PgUp/PgDn 으로
+                    moveDX = dragAxis != Direction.Axis.X ? baseDX + (int) Math.round(now.x - dragStart.x) : baseDX;
+                    moveDY = dragAxis != Direction.Axis.Y ? baseDY + (int) Math.round(now.y - dragStart.y) : baseDY;
+                    moveDZ = dragAxis != Direction.Axis.Z ? baseDZ + (int) Math.round(now.z - dragStart.z) : baseDZ;
+                }
             }
         }
     }

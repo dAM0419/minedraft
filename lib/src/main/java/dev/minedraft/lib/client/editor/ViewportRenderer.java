@@ -162,6 +162,8 @@ public final class ViewportRenderer {
         RenderSystem.applyModelViewMatrix();
         VertexConsumer lines = BUFFERS.getBuffer(LibRenderTypes.LINES_SEE_THROUGH);
         if (!screen.tagTool.active && !imm) screen.drawOverlayLines(lines, ps, tx, ty, tz);
+        // 태그 범위 상자: 블록 뒤로 들어간 모서리도 옅게 보이게
+        if (screen.tagTool.active && !imm) screen.drawRangeBox(lines, ps, tx, ty, tz, 0x70);
         // 다른 편집자 범위 (점선)
         for (AreaEditorSession.RemoteCursor c : s.cursors.values()) {
             if (!c.has()) continue;
@@ -185,7 +187,7 @@ public final class ViewportRenderer {
             }
             if (!imm) {
                 screen.drawTagToolLines(solidLines, ps, tx, ty, tz);
-                screen.drawRangeHandles(solidLines, ps, tx, ty, tz);
+                screen.drawRangeBox(solidLines, ps, tx, ty, tz, 0xFF);
             }
         }
         // 단면 예외 칸 (단면을 켠 뒤 놓아서 잘린 쪽인데도 보이는 칸): 옅은 청록 테두리
@@ -278,6 +280,8 @@ public final class ViewportRenderer {
             Ui.text(g, name, x, y, EditorColors.editorColor(c.player()));
         }
         screen.render2DExtras(g, mx, my);
+        // 태그 범위 화살표 (블록에 가리지 않게 2D 로 맨 위에)
+        if (screen.tagTool.active && !imm) screen.drawRangeArrows(g);
         // 섹션 굽는 중
         if (s.renderer != null && s.renderer.isLoading()) {
             Component t = Component.translatable("minedraftlib.editor.meshing", (int) (s.renderer.progress() * 100));

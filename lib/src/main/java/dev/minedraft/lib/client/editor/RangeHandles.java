@@ -3,7 +3,7 @@ package dev.minedraft.lib.client.editor;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.minedraft.lib.util.Box;
-import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
@@ -66,14 +66,37 @@ final class RangeHandles {
         return new Box(x0, y0, z0, x1, y1, z1);
     }
 
-    /** 커서 근처(8픽셀)의 손잡이 면 번호 (-1 = 없음). */
+    /** 화살표 시작점이 면 가운데에서 바깥으로 떨어진 거리, 화살표 길이, 누를 수 있는 반지름 (화면 픽셀). */
+    private static final float GAP = 6, LEN = 18, HIT = 9;
+
+    /**
+     * 면 d 의 화살표: {밑점 x, y, 방향 x, y}. 방향은 면 법선을 화면에 투영한 단위 벡터
+     * (법선이 화면을 향하면 방향 0 — 점으로 그리고 끌 수 없다).
+     */
+    private float[] arrow(Box b, Direction d) {
+        double[] c = faceCenter(b, d);
+        Vector3f p0 = cam().project(c[0], c[1], c[2]);
+        Vector3f p1 = cam().project(c[0] + d.getStepX(), c[1] + d.getStepY(), c[2] + d.getStepZ());
+        float dx = p1.x - p0.x, dy = p1.y - p0.y;
+        float len = (float) Math.sqrt(dx * dx + dy * dy);
+        if (len < 0.5F) return new float[]{p0.x, p0.y, 0, 0};
+        dx /= len;
+        dy /= len;
+        return new float[]{p0.x + dx * GAP, p0.y + dy * GAP, dx, dy};
+    }
+
+    /** 커서 아래의 화살표 면 번호 (-1 = 없음). 화살표 몸통 가운데에서 가장 가까운 것. */
     private int hovered(Box b, double mx, double my) {
         int best = -1;
-        double bestD = 64;
+        double bestD = HIT * HIT;
         for (int i = 0; i < FACES.length; i++) {
-            double[] c = faceCenter(b, FACES[i]);
-            Vector3f p = cam().project(c[0], c[1], c[2]);
-            double d = (p.x - mx) * (p.x - mx) + (p.y - my) * (p.y - my);
+            float[] a = arrow(b, FACES[i]);
+            if (a[2] == 0 && a[3] == 0) continue;
+            double cx = a[0] + a[2] * LEN / 2, cy = a[1] + a[3] * LEN / 2;
+            // 몸통 선분까지의 거리
+            double t = Math.max(-LEN / 2, Math.min(LEN / 2, (mx - cx) * a[2] + (my - cy) * a[3]));
+            double px = cx + a[2] * t - mx, py = cy + a[3] * t - my;
+            double d = px * px + py * py;
             if (d < bestD) {
                 bestD = d;
                 best = i;
@@ -130,17 +153,52 @@ final class RangeHandles {
         return nb;
     }
 
-    void draw(VertexConsumer lines, PoseStack ps, double tx, double ty, double tz) {
+    /** 3D: 범위 상자 (가리는 블록 뒤는 see-through 선으로 옅게, 앞은 진하게). */
+    void drawBox(VertexConsumer lines, PoseStack ps, double tx, double ty, double tz, int alpha) {
         Box b = shown();
         if (b == null) return;
-        ViewportRenderer.box(lines, ps, b, tx, ty, tz, screen.tagRangeColor());
+        int c = screen.tagRangeColor();
+        ViewportRenderer.box(lines, ps, b, tx, ty, tz, (c & 0xFFFFFF) | (alpha << 24));
+    }
+
+    /** 2D: 여섯 면의 화살표. 블록 위에 그리므로 가려지지 않는다. */
+    void drawArrows(GuiGraphics g) {
+        Box b = shown();
+        if (b == null) return;
         int hov = dragging() ? face : hovered(b, screen.mouseX(), screen.mouseY());
+        int accent = 0xFF000000 | screen.tagRangeColor();
         for (int i = 0; i < FACES.length; i++) {
-            double[] c = faceCenter(b, FACES[i]);
-            double r = i == hov ? 0.3 : 0.18;
-            float a = i == hov ? 1.0F : 0.75F;
-            LevelRenderer.renderLineBox(ps, lines, c[0] - r - tx, c[1] - r - ty, c[2] - r - tz,
-                    c[0] + r - tx, c[1] + r - ty, c[2] + r - tz, 1.0F, 1.0F, 1.0F, a);
+            float[] a = arrow(b, FACES[i]);
+            boolean h = i == hov;
+            if (a[2] == 0 && a[3] == 0) {
+                // 화면을 향한 면: 끌 수 없다는 표시로 작은 점
+                g.fill((int) a[0] - 2, (int) a[1] - 2, (int) a[0] + 2, (int) a[1] + 2, 0xA0000000);
+                g.fill((int) a[0] - 1, (int) a[1] - 1, (int) a[0] + 1, (int) a[1] + 1, 0xC0FFFFFF);
+                continue;
+            }
+            float ang = (float) Math.atan2(a[3], a[2]);
+            float scale = h ? 1.25F : 1.0F;
+            g.pose().pushPose();
+            g.pose().translate(a[0], a[1], 0);
+            g.pose().mulPose(com.mojang.math.Axis.ZP.rotation(ang));
+            g.pose().scale(scale, scale, 1);
+            arrowShape(g, 1, 0xC0000000);        // 테두리
+            arrowShape(g, 0, h ? accent : 0xFFFFFFFF);
+            g.pose().popPose();
+        }
+    }
+
+    /** x 축 방향 화살표 (밑점 0, 끝 LEN). grow 만큼 두껍게 (테두리). */
+    private static void arrowShape(GuiGraphics g, int grow, int color) {
+        int len = (int) LEN, head = 7;
+        // 몸통
+        g.fill(-grow, -1 - grow, len - head + 1, 2 + grow, color);
+        // 머리: 세로 줄을 끝으로 갈수록 좁게
+        for (int i = 0; i <= head + grow; i++) {
+            int x = len - head + i - grow;
+            int hw = head - i + grow;
+            if (hw < 0) break;
+            g.fill(x, -hw, x + 1, hw + 1, color);
         }
     }
 }

@@ -317,7 +317,7 @@
   "designandbuild.save.title": "Save structure",
   "designandbuild.select.delete": "Delete structure",
   "designandbuild.select.deselect": "Deselect",
-  "designandbuild.select.hint": "Drag to move · PgUp/PgDn: up/down",
+  "designandbuild.select.hint": "Drag to move · Shift+drag: up/down only · PgUp/PgDn: one block up/down",
   "designandbuild.select.mirror": "Mirror",
   "designandbuild.select.none": "Click a structure volume to select it",
   "designandbuild.select.rotate": "Rotate 90°",
@@ -458,5 +458,6 @@
   "key.designandbuild.layer_up": "Projection: layer up",
   "key.designandbuild.materials": "Projection: materials list",
   "key.designandbuild.stage_next": "Projection: next stage",
-  "key.designandbuild.stage_prev": "Projection: previous stage"
+  "key.designandbuild.stage_prev": "Projection: previous stage",
+  "designandbuild.help.drag_vertical": "Move up / down only"
 }

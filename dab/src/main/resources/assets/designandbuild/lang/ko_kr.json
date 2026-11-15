@@ -317,7 +317,7 @@
   "designandbuild.save.title": "구조물 저장",
   "designandbuild.select.delete": "구조물 삭제",
   "designandbuild.select.deselect": "선택 해제",
-  "designandbuild.select.hint": "끌어서 이동 · PgUp/PgDn: 위·아래",
+  "designandbuild.select.hint": "끌어서 이동 · Shift+끌기: 위·아래만 · PgUp/PgDn: 한 칸 위·아래",
   "designandbuild.select.mirror": "좌우 반전",
   "designandbuild.select.none": "구조물 볼륨을 눌러 선택하세요",
   "designandbuild.select.rotate": "90° 회전",
@@ -458,5 +458,6 @@
   "key.designandbuild.layer_up": "투영: 위층으로",
   "key.designandbuild.materials": "투영: 재료 목록 펼치기",
   "key.designandbuild.stage_next": "투영: 다음 단계",
-  "key.designandbuild.stage_prev": "투영: 이전 단계"
+  "key.designandbuild.stage_prev": "투영: 이전 단계",
+  "designandbuild.help.drag_vertical": "위·아래로만 이동"
 }
