@@ -53,6 +53,14 @@ public final class FakeLevel extends Level {
         @Nullable
         BlockEntity blockEntity(BlockPos pos);
 
+        /**
+         * 블록을 바꾸려 한다 (블록의 설치·제거 반응이 이웃을 바꿀 때). 받아들이면 true.
+         * 기본은 읽기 전용: 무시한다. 시뮬레이션하는 쪽이 이 쓰기를 모아 설계에 반영한다.
+         */
+        default boolean setBlock(BlockPos pos, BlockState state) {
+            return false;
+        }
+
         /** 바이옴 (4칸 단위 좌표가 아니라 블록 좌표). 모르면 null = 실제 월드 것. */
         @Nullable
         default Holder<Biome> biome(int x, int y, int z) {
@@ -91,12 +99,12 @@ public final class FakeLevel extends Level {
 
     @Override
     public boolean setBlock(BlockPos pos, BlockState state, int flags, int recursion) {
-        return false;
+        return source.setBlock(pos.immutable(), state);
     }
 
     @Override
     public boolean removeBlock(BlockPos pos, boolean moving) {
-        return false;
+        return source.setBlock(pos.immutable(), getFluidState(pos).createLegacyBlock());
     }
 
     @Override

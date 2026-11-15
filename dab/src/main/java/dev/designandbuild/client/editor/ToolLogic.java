@@ -225,6 +225,8 @@ public final class ToolLogic {
             PlacementStates.expandMultiBlocks(s, cells);
             PlacementStates.updateConnections(s, cells, structureLayer(s));
         }
+        // 놓고 지울 때 블록이 주변을 보고 바뀌는 반응 (증기기관 축 → 동력 축 등)
+        if (!cells.isEmpty()) WorldReactions.apply(s, cells, structureLayer(s), erase);
         return cells;
     }
 
