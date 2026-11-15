@@ -322,7 +322,7 @@ public final class PlacementStates {
     // ------------------------------------------------------------------
 
     /** 하늘 위 가상 설치 상황. 플레이어 없이, 삼면도에서 고른 시선을 쓴다. */
-    private static final class VirtualPlaceContext extends BlockPlaceContext {
+    static final class VirtualPlaceContext extends BlockPlaceContext {
         private final BlockPos target;
         private final Direction look;
         private final Direction horizontal;

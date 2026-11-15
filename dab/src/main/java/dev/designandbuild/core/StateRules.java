@@ -104,12 +104,18 @@ public final class StateRules {
         net.minecraft.world.level.LevelReader level = probe.get();
         if (level == null) return Items.AIR; // 아직 월드를 모른다: 기억하지 않고 다음에 다시 묻는다
         Item it;
+        // NeoForge 확장판(상태·조준·플레이어를 받는 것)을 부른다. Create 동력 축 등은 이쪽만 덮어쓴다
+        BlockState ds = b.defaultBlockState();
+        ItemStack st = ItemStack.EMPTY;
         try {
-            ItemStack st = b.getCloneItemStack(level, BlockPos.ZERO, b.defaultBlockState());
-            it = st.isEmpty() ? Items.AIR : st.getItem();
+            st = b.getCloneItemStack(ds, new BlockHitResult(Vec3.ZERO, Direction.UP, BlockPos.ZERO, false), level, BlockPos.ZERO, null);
         } catch (Throwable t) {
-            it = Items.AIR;
+            try {
+                st = b.getCloneItemStack(level, BlockPos.ZERO, ds);
+            } catch (Throwable ignored) {
+            }
         }
+        it = st == null || st.isEmpty() ? Items.AIR : st.getItem();
         PICK_ITEM.put(b, it);
         return it;
     }

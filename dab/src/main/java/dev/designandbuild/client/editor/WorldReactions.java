@@ -36,6 +36,8 @@ final class WorldReactions {
 
     /** 이 칸 수를 넘는 채우기는 흉내 내지 않는다 (미리보기마다 돌기 때문). */
     private static final int MAX_CELLS = 2048;
+    /** 둘레 파생 블록 다시 보기는 이 칸 수까지 (칸마다 이웃 12칸). */
+    private static final int REVALIDATE_MAX = 256;
 
     /** 가짜 월드가 읽고 쓰는 곳. 가짜 월드는 한 번 만들고 이 내용만 바꿔 쓴다. */
     private static final class Sim implements FakeLevel.Source {
@@ -141,6 +143,27 @@ final class WorldReactions {
                 if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue;
                 cells.put(q, ns);
             }
+            sim.writes.clear(); // 받아들인 변화는 cells 에 있다. 버린 변화가 다음 판정에 비치지 않게
+            // 3) 둘레 2칸의 파생 블록이 아직 조건을 만족하는지 (증기기관을 치우면 동력 축 → 축: Create 는 서버 틱에서 되돌린다)
+            if (keys.length <= REVALIDATE_MAX) {
+                it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+                for (long p : keys) {
+                    BlockPos pos = BlockPos.of(p);
+                    for (Direction d : Direction.values()) {
+                        for (int k = 1; k <= 2; k++) {
+                            long q = pos.relative(d, k).asLong();
+                            if (!seen.add(q) || !s.model.isInside(q)) continue;
+                            BlockState cur = sim.read(q);
+                            if (cur.isAir() || cur.getBlock().asItem() != net.minecraft.world.item.Items.AIR) continue; // 파생 블록만
+                            if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue;
+                            BlockState alt = placeInContext(lv, sim, q, cur);
+                            if (alt != null && alt.getBlock() != cur.getBlock() && StateRules.derivedEquivalent(alt, cur)) {
+                                cells.put(q, copyShared(cur, alt));
+                            }
+                        }
+                    }
+                }
+            }
         } catch (Throwable ignored) {
         } finally {
             sim.recording = false;
@@ -165,23 +188,11 @@ final class WorldReactions {
         BlockState saved = sim.cells.get(p);
         sim.writes.put(p, Blocks.AIR.defaultBlockState());
         try {
-            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos.below(), false);
-            BlockPlaceContext ctx = new BlockPlaceContext(lv, null, InteractionHand.MAIN_HAND, new ItemStack(bi), hit) {
-                @Override
-                public BlockPos getClickedPos() {
-                    return pos;
-                }
-
-                @Override
-                public boolean canPlace() {
-                    return true;
-                }
-
-                @Override
-                public boolean replacingClickedOnBlock() {
-                    return false;
-                }
-            };
+            // 놓을 때 고른 방향에 맞춘 가상 시선 (플레이어 없이 시선을 묻는 블록이 있다: Create 축 등)
+            Direction look = lookOf(st);
+            Direction horizontal = look.getAxis().isHorizontal() ? look : Direction.NORTH;
+            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), look.getOpposite(), pos.relative(look), false);
+            BlockPlaceContext ctx = new PlacementStates.VirtualPlaceContext(lv, new ItemStack(bi), hit, pos, look, horizontal);
             return bi.getBlock().getStateForPlacement(ctx);
         } catch (Throwable t) {
             return null;
@@ -189,6 +200,16 @@ final class WorldReactions {
             sim.writes.remove(p);
             if (saved != null) sim.cells.put(p, saved);
         }
+    }
+
+    /** 상태가 가리키는 방향 (축·방향 속성). 없으면 아래. */
+    private static Direction lookOf(BlockState st) {
+        for (Property<?> p : st.getProperties()) {
+            Object v = st.getValue(p);
+            if (v instanceof Direction d) return d;
+            if (v instanceof Direction.Axis a) return Direction.fromAxisAndDirection(a, Direction.AxisDirection.POSITIVE);
+        }
+        return Direction.DOWN;
     }
 
     /** alt 에, st 와 이름이 같은 속성의 값(축·방향 등)을 옮긴다. 놓을 때 고른 방향을 지킨다. */
