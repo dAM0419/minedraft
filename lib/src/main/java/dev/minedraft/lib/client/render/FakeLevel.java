@@ -1,4 +1,4 @@
-package dev.minedraft.lib.client.editor;
+package dev.minedraft.lib.client.render;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -41,24 +41,41 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * 편집창 블록 엔티티가 붙는 가짜 월드 (읽기 전용). 블록은 편집창이 보는 블록(설계 + 월드 사본),
- * 블록 엔티티는 편집창이 만든 것. 블록 엔티티 렌더러·모델이 이웃 블록과 블록 엔티티를 이 월드에서 찾는다.
+ * 블록 엔티티가 붙는 가짜 월드 (읽기 전용). 블록과 블록 엔티티는 {@link Source} 가 준다
+ * (편집창: 설계 + 월드 사본, 투영: 유령 블록 + 실제 월드). 블록 엔티티 렌더러·모델이 이웃 블록과 블록 엔티티를 이 월드에서 찾는다.
  * 쓰기·소리·엔티티는 모두 무시한다. Create 의 Ponder 월드와 같은 방식.
  */
-final class EditorLevel extends Level {
-    private final AreaEditorSession session;
-    private final ClientLevel real;
+public final class FakeLevel extends Level {
+    /** 가짜 월드가 보여 줄 내용. */
+    public interface Source {
+        BlockState blockAt(int x, int y, int z);
 
-    EditorLevel(AreaEditorSession session, ClientLevel real) {
+        @Nullable
+        BlockEntity blockEntity(BlockPos pos);
+
+        /** 바이옴 (4칸 단위 좌표가 아니라 블록 좌표). 모르면 null = 실제 월드 것. */
+        @Nullable
+        default Holder<Biome> biome(int x, int y, int z) {
+            return null;
+        }
+    }
+
+    private final Source source;
+    private final ClientLevel real;
+    private final int minY, height;
+
+    public FakeLevel(Source source, ClientLevel real, int minY, int height) {
         super((WritableLevelData) real.getLevelData(), real.dimension(), real.registryAccess(), real.dimensionTypeRegistration(),
                 real::getProfiler, true, false, 0, 0);
-        this.session = session;
+        this.source = source;
         this.real = real;
+        this.minY = minY;
+        this.height = height;
     }
 
     @Override
     public BlockState getBlockState(BlockPos pos) {
-        return session.blockAt(pos.getX(), pos.getY(), pos.getZ(), false);
+        return source.blockAt(pos.getX(), pos.getY(), pos.getZ());
     }
 
     @Override
@@ -69,7 +86,7 @@ final class EditorLevel extends Level {
     @Nullable
     @Override
     public BlockEntity getBlockEntity(BlockPos pos) {
-        return session.blockEntities.get(pos);
+        return source.blockEntity(pos);
     }
 
     @Override
@@ -203,7 +220,7 @@ final class EditorLevel extends Level {
 
     @Override
     public Holder<Biome> getUncachedNoiseBiome(int x, int y, int z) {
-        Holder<Biome> b = session.snapshot.biome(x << 2, y << 2, z << 2);
+        Holder<Biome> b = source.biome(x << 2, y << 2, z << 2);
         return b != null ? b : real.getUncachedNoiseBiome(x, y, z);
     }
 
@@ -242,12 +259,12 @@ final class EditorLevel extends Level {
     // 높이는 편집창 영역 기준 (다른 모드가 기본 구현을 바꿔도 맞게 직접 계산)
     @Override
     public int getMinBuildHeight() {
-        return session.area.minY;
+        return minY;
     }
 
     @Override
     public int getHeight() {
-        return session.area.maxY - session.area.minY;
+        return height;
     }
 
     @Override

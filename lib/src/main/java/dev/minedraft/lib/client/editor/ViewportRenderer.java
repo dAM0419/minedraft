@@ -317,7 +317,7 @@ public final class ViewportRenderer {
                 g.fill(cx - 5, cy, cx + 6, cy + 1, 0xE0FFFFFF);
                 g.fill(cx, cy - 5, cx + 1, cy + 6, 0xE0FFFFFF);
             }
-            Component hint = Component.translatable(screen.immersive.flying ? "minedraftlib.immersive.hint_fly" : "minedraftlib.immersive.hint_walk");
+            Component hint = Component.translatable("minedraftlib.immersive.hint_fly");
             int hw = Ui.font().width(hint);
             int hy = screen.vpY + screen.vpH - 14;
             g.fill(cx - hw / 2 - 4, hy - 2, cx + hw / 2 + 4, hy + 10, 0xA0101418);

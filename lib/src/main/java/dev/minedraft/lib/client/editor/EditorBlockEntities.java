@@ -3,6 +3,7 @@ package dev.minedraft.lib.client.editor;
 import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import dev.minedraft.lib.client.render.FakeLevel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -56,7 +57,7 @@ public final class EditorBlockEntities {
         return m == null ? null : m.get(key);
     }
     @Nullable
-    private EditorLevel level;
+    private FakeLevel level;
     private boolean levelFailed;
 
     EditorBlockEntities(AreaEditorSession session) {
@@ -64,12 +65,27 @@ public final class EditorBlockEntities {
     }
 
     @Nullable
-    private EditorLevel level() {
+    private FakeLevel level() {
         if (level == null && !levelFailed) {
             var real = Minecraft.getInstance().level;
             if (real == null) return null;
             try {
-                level = new EditorLevel(session, real);
+                level = new FakeLevel(new FakeLevel.Source() {
+                    @Override
+                    public BlockState blockAt(int x, int y, int z) {
+                        return session.blockAt(x, y, z, false);
+                    }
+
+                    @Override
+                    public BlockEntity blockEntity(BlockPos pos) {
+                        return get(pos);
+                    }
+
+                    @Override
+                    public net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome(int x, int y, int z) {
+                        return session.snapshot.biome(x, y, z);
+                    }
+                }, real, session.area.minY, session.area.maxY - session.area.minY);
             } catch (Throwable t) {
                 levelFailed = true;
                 LOG.warn("Minedraft editor: could not create the editor level for block entities", t);
@@ -80,7 +96,7 @@ public final class EditorBlockEntities {
 
     /** 가짜 월드 (만들 수 없으면 null). */
     @Nullable
-    EditorLevel levelOrNull() {
+    FakeLevel levelOrNull() {
         return level();
     }
 
@@ -115,7 +131,7 @@ public final class EditorBlockEntities {
 
     @Nullable
     private BlockEntity create(BlockPos pos, BlockState state) {
-        EditorLevel lv = level();
+        FakeLevel lv = level();
         if (lv == null || !(state.getBlock() instanceof EntityBlock eb)) return null;
         try {
             BlockEntity be = eb.newBlockEntity(pos, state);

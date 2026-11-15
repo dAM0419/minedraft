@@ -29,6 +29,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -77,6 +79,8 @@ public final class ProjectionRenderer {
         VertexBuffer lines;
         @Nullable
         VertexBuffer quads;
+        /** 블록 엔티티가 있는 유령 칸 (렌더러로 그릴 부분: 밸브 손잡이, 톱니 등). */
+        long[] entities = new long[0];
 
         final AABB box;
         /** 이 프레임의 모델뷰 (구역 원점 기준). */
@@ -90,7 +94,7 @@ public final class ProjectionRenderer {
         }
 
         boolean isEmpty() {
-            return (ghost == null || ghost.isEmpty()) && lines == null && quads == null;
+            return (ghost == null || ghost.isEmpty()) && lines == null && quads == null && entities.length == 0;
         }
 
         @Override
@@ -114,6 +118,13 @@ public final class ProjectionRenderer {
     private static BlockMesher mesher;
     @Nullable
     private static Projection owner;
+    /** 한 프레임에 그릴 유령 블록 엔티티 수 상한. */
+    private static final int MAX_GHOST_BLOCK_ENTITIES = 2000;
+    private static final dev.minedraft.lib.client.render.GhostBlockEntities GHOST_BE = new dev.minedraft.lib.client.render.GhostBlockEntities((x, y, z) -> {
+        Projection p = owner;
+        BlockState st = p == null ? null : p.ghostAt(BlockPos.asLong(x, y, z));
+        return st == null ? net.minecraft.world.level.block.Blocks.AIR.defaultBlockState() : st;
+    });
 
     public static void clear() {
         for (SectionVisual v : VISUALS.values()) v.close();
@@ -121,6 +132,7 @@ public final class ProjectionRenderer {
         QUEUE.clear();
         QUEUED.clear();
         owner = null;
+        GHOST_BE.clear();
         // 화면 크기 합성 버퍼는 투영을 다시 그릴 때 만든다 (들고 있지 않을 때 그래픽 메모리를 쥐고 있지 않게)
         if (ghostTarget != null) {
             ghostTarget.destroyBuffers();
@@ -217,6 +229,12 @@ public final class ProjectionRenderer {
             // 불투명하게 굽는다 (반투명은 합성 단계에서 한 번에).
             // 이웃 구역의 유령도 보이게 투영 전체를 조회한다: 구역 경계에서 맞닿은 면이 지워지고 그늘이 이어진다
             v.ghost = mesher.build(new MapWorld(p::ghostAt, oy - 16, 48, true), ghostList.iterator(), ox, oy, oz, 1.0F, false);
+            it.unimi.dsi.fastutil.longs.LongArrayList ents = new it.unimi.dsi.fastutil.longs.LongArrayList();
+            for (BlockPos gp : ghostList) {
+                BlockState st = p.ghostAt(gp.asLong());
+                if (st != null && st.hasBlockEntity()) ents.add(gp.asLong());
+            }
+            v.entities = ents.toLongArray();
         }
         if (!v.isEmpty()) VISUALS.put(sec, v);
         return Math.max(1, work);
@@ -342,10 +360,26 @@ public final class ProjectionRenderer {
         }
     }
 
+    /** 유령 블록의 블록 엔티티 렌더러 (Ponder 처럼): 유령 버퍼에 같이 그려 함께 반투명해진다. */
+    private static void drawGhostBlockEntities(List<SectionVisual> visible, Matrix4f view, Vec3 cam) {
+        Minecraft mc = Minecraft.getInstance();
+        MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
+        com.mojang.blaze3d.vertex.PoseStack pose = new com.mojang.blaze3d.vertex.PoseStack();
+        pose.last().pose().set(view);
+        pose.last().normal().set(new org.joml.Matrix3f(view));
+        float pt = mc.getTimer().getGameTimeDeltaPartialTick(false);
+        int left = MAX_GHOST_BLOCK_ENTITIES;
+        for (SectionVisual v : visible) {
+            if (v.entities.length == 0 || left <= 0) continue;
+            left -= GHOST_BE.render(v.entities, pose, buffers, cam.x, cam.y, cam.z, pt, left);
+        }
+        buffers.endBatch();
+    }
+
     /** 주 화면 깊이를 복사한 별도 버퍼에 불투명하게 그리고 (겹친 면은 깊이로 가려짐), 결과를 반투명하게 덮는다. */
     private static void drawGhostsComposited(List<SectionVisual> visible, Matrix4f view, Matrix4f proj, Vec3 cam, float opacity) {
         boolean any = false;
-        for (SectionVisual v : visible) if (v.ghost != null && !v.ghost.isEmpty()) any = true;
+        for (SectionVisual v : visible) if ((v.ghost != null && !v.ghost.isEmpty()) || v.entities.length > 0) any = true;
         if (!any) return;
         Minecraft mc = Minecraft.getInstance();
         RenderTarget main = mc.getMainRenderTarget();
@@ -365,6 +399,7 @@ public final class ProjectionRenderer {
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(true);
         drawGhostLayers(visible, view, proj, cam);
+        drawGhostBlockEntities(visible, view, cam);
         GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFbo);
         GlStateManager._viewport(0, 0, main.viewWidth, main.viewHeight);
 

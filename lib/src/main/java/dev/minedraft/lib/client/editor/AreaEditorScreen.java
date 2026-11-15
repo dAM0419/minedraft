@@ -448,6 +448,8 @@ public abstract class AreaEditorScreen extends Screen {
                         Component.translatable("minedraftlib.shader.open_anyway"), false, () -> {}).onCancel(this::onClose));
             }
         }
+        // 입력칸을 쓰지 않는 동안은 입력기를 영문으로 (한글 상태면 W·A·S·D 가 게임에 오지 않는다)
+        if (modal == null && focused == null) dev.minedraft.lib.client.ImeControl.forceAlphanumeric();
         base.tickEffects();
         base.checkCutChanged();
         beforeFrame();
@@ -465,6 +467,11 @@ public abstract class AreaEditorScreen extends Screen {
         }
         base.renderer.update(6_000_000L);
         afterMeshing();
+        if (immersive.active && immersive.grabbed()) {
+            // 마우스를 잡은 동안 GLFW 의 보이지 않는 커서 좌표가 UI 에 닿지 않게 (툴팁·강조가 따라 움직이던 문제)
+            mx = vpX + vpW / 2;
+            my = vpY + vpH / 2;
+        }
         if (immersive.active) {
             mouseX = mx;
             mouseY = my;
@@ -621,7 +628,7 @@ public abstract class AreaEditorScreen extends Screen {
     protected String[][] helpImmersive() {
         if (!supportsImmersive()) return null;
         return new String[][]{{"minedraftlib.immersive.title"}, {"I", "minedraftlib.help.immersive_toggle"},
-                {"@move", "minedraftlib.help.immersive_move"}, {"F", "minedraftlib.help.immersive_fly"},
+                {"@move", "minedraftlib.help.immersive_move"},
                 {"minedraftlib.key.lmb", "minedraftlib.help.immersive_break"}, {"minedraftlib.key.rmb", "minedraftlib.help.immersive_place"},
                 {"minedraftlib.key.mmb", "minedraftlib.help.immersive_pick"}, {"E", "minedraftlib.help.immersive_items"},
                 {"Esc", "minedraftlib.help.immersive_exit"}};
@@ -1018,17 +1025,13 @@ public abstract class AreaEditorScreen extends Screen {
         return true;
     }
 
-    /** 몰입형 설계 중 키: Esc·I 나가기, E 고르기 창, F 비행/걷기, 스페이스 두 번 비행, Ctrl+Z/Y, H, T, C. 이동은 매 프레임 키 상태로. */
+    /** 몰입형 설계 중 키: Esc·I 나가기, E 고르기 창, Ctrl+Z/Y, H, T, C. 이동은 매 프레임 키 상태로. */
     private void immersiveKey(int key) {
         Minecraft mc = Minecraft.getInstance();
         if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_I) {
             setImmersive(false);
         } else if (mc.options.keyInventory.matches(key, 0)) {
             openItemPicker();
-        } else if (key == GLFW.GLFW_KEY_F) {
-            immersive.toggleFlying();
-        } else if (mc.options.keyJump.matches(key, 0)) {
-            immersive.jumpPressed();
         } else if (hasControlDown() && key == GLFW.GLFW_KEY_Z) {
             base.send(hasShiftDown() ? new EditRequests.Redo() : new EditRequests.Undo());
         } else if (hasControlDown() && key == GLFW.GLFW_KEY_Y) {

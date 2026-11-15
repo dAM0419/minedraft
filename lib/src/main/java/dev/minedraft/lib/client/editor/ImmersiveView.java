@@ -3,46 +3,32 @@ package dev.minedraft.lib.client.editor;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 몰입형 설계: 편집창 뷰포트 안에서 1인칭으로 영역 안을 돌아다니는 시점 (편집창 화면은 그대로).
- * 마우스로 고개를 돌리고 이동 키로 움직인다. 비행(벽 통과)과 걷기(중력·충돌)를 오간다.
+ * 마우스로 고개를 돌리고 이동 키로 움직인다. 막힘 없는 비행만 (벽 통과, 중력 없음).
  * 각도는 바닐라와 같은 규칙: yaw 0 = 남쪽(+Z), pitch 양수 = 아래.
  */
 public final class ImmersiveView {
     /** 블록을 고를 수 있는 거리. */
     public static final double REACH = 6.0;
     private static final float FOV = 70.0F;
-    private static final double EYE = 1.62, HALF_W = 0.3, HEIGHT = 1.8, STEP = 0.6;
 
     private final AreaEditorScreen screen;
     public boolean active;
-    /** 비행(벽 통과) / 걷기(중력·충돌). */
-    public boolean flying = true;
     /** 눈 위치. */
     public double x, y, z;
     public float yaw, pitch;
 
-    private double vy;
-    private boolean onGround;
     private boolean grabbed;
     private double lastMouseX, lastMouseY;
     private long lastNanos;
-    private long lastJumpPress;
 
     ImmersiveView(AreaEditorScreen screen) {
         this.screen = screen;
@@ -73,8 +59,6 @@ public final class ImmersiveView {
         x = cx - look.x * dist;
         y = cy - look.y * dist;
         z = cz - look.z * dist;
-        vy = 0;
-        flying = true;
         active = true;
         lastNanos = System.nanoTime();
     }
@@ -156,7 +140,7 @@ public final class ImmersiveView {
 
     void tick() {
         long now = System.nanoTime();
-        double dt = Math.min(0.05, (now - lastNanos) / 1.0E9);
+        double dt = Math.min(0.1, (now - lastNanos) / 1.0E9);
         lastNanos = now;
         Minecraft mc = Minecraft.getInstance();
         if (grabbed) {
@@ -188,106 +172,19 @@ public final class ImmersiveView {
             fx = (-sin * fwd + cos * side) / len;
             fz = (cos * fwd + sin * side) / len;
         }
-        if (flying) {
-            double speed = (sprint ? 22.0 : 11.0) * dt;
-            int up = (held(o.keyJump) ? 1 : 0) - (held(o.keyShift) ? 1 : 0);
-            x += fx * speed;
-            z += fz * speed;
-            y += up * speed;
-        } else {
-            double speed = (sprint ? 5.6 : held(o.keyShift) ? 1.3 : 4.3) * dt;
-            if (onGround && held(o.keyJump)) vy = 8.4;
-            vy = Math.max(-60, vy - 32.0 * dt);
-            move(fx * speed, vy * dt, fz * speed);
-        }
+        double speed = (sprint ? 22.0 : 11.0) * dt;
+        int up = (held(o.keyJump) ? 1 : 0) - (held(o.keyShift) ? 1 : 0);
+        x += fx * speed;
+        z += fz * speed;
+        y += up * speed;
         double minY = s().area.minY - 32, maxY = s().area.maxY + 64;
         y = Mth.clamp(y, minY, maxY);
-    }
-
-    /** 스페이스 두 번 누르기 = 비행 켜고 끄기 (바닐라 크리에이티브처럼). */
-    void jumpPressed() {
-        long now = System.currentTimeMillis();
-        if (now - lastJumpPress < 300) {
-            toggleFlying();
-            lastJumpPress = 0;
-        } else {
-            lastJumpPress = now;
-        }
-    }
-
-    public void toggleFlying() {
-        flying = !flying;
-        vy = 0;
     }
 
     private static boolean held(KeyMapping key) {
         InputConstants.Key k = key.getKey();
         if (k.getType() != InputConstants.Type.KEYSYM) return false;
         return InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), k.getValue());
-    }
-
-    // ------------------------------------------------------------------
-    // 걷기: 충돌 (숨긴 블록도 딛는다 — 구조물만 보여도 땅 위를 걷는다)
-    // ------------------------------------------------------------------
-
-    private AABB body() {
-        double feet = y - EYE;
-        return new AABB(x - HALF_W, feet, z - HALF_W, x + HALF_W, feet + HEIGHT, z + HALF_W);
-    }
-
-    private List<VoxelShape> shapesAround(AABB box) {
-        List<VoxelShape> out = new ArrayList<>();
-        AreaEditorSession ses = s();
-        EditorLevel lv = ses.blockEntities.levelOrNull();
-        BlockPos.MutableBlockPos mp = new BlockPos.MutableBlockPos();
-        int x0 = Mth.floor(box.minX) - 1, x1 = Mth.floor(box.maxX) + 1;
-        int y0 = Mth.floor(box.minY) - 1, y1 = Mth.floor(box.maxY) + 1;
-        int z0 = Mth.floor(box.minZ) - 1, z1 = Mth.floor(box.maxZ) + 1;
-        for (int bx = x0; bx <= x1; bx++)
-            for (int by = y0; by <= y1; by++)
-                for (int bz = z0; bz <= z1; bz++) {
-                    BlockState st = ses.blockAt(bx, by, bz, false);
-                    if (st.isAir()) continue;
-                    mp.set(bx, by, bz);
-                    VoxelShape sh;
-                    try {
-                        sh = lv != null ? st.getCollisionShape(lv, mp, CollisionContext.empty()) : st.getCollisionShape(ses.world, mp);
-                    } catch (Throwable t) {
-                        sh = Shapes.block();
-                    }
-                    if (!sh.isEmpty()) out.add(sh.move(bx, by, bz));
-                }
-        return out;
-    }
-
-    private void move(double dx, double dy, double dz) {
-        AABB box = body();
-        List<VoxelShape> shapes = shapesAround(box.expandTowards(dx, dy, dz).inflate(STEP));
-        double my = Shapes.collide(Direction.Axis.Y, box, shapes, dy);
-        box = box.move(0, my, 0);
-        boolean landed = dy < 0 && my != dy;
-        if (my != dy) vy = 0;
-        double mx = Shapes.collide(Direction.Axis.X, box, shapes, dx);
-        box = box.move(mx, 0, 0);
-        double mz = Shapes.collide(Direction.Axis.Z, box, shapes, dz);
-        box = box.move(0, 0, mz);
-        // 반 블록·계단 오르기
-        if ((landed || onGround) && (mx != dx || mz != dz)) {
-            AABB up = body().move(0, my, 0);
-            double sy = Shapes.collide(Direction.Axis.Y, up, shapes, STEP);
-            AABB stepped = up.move(0, sy, 0);
-            double sx = Shapes.collide(Direction.Axis.X, stepped, shapes, dx);
-            stepped = stepped.move(sx, 0, 0);
-            double sz = Shapes.collide(Direction.Axis.Z, stepped, shapes, dz);
-            stepped = stepped.move(0, 0, sz);
-            double down = Shapes.collide(Direction.Axis.Y, stepped, shapes, -sy);
-            stepped = stepped.move(0, down, 0);
-            if (sx * sx + sz * sz > mx * mx + mz * mz) box = stepped;
-        }
-        onGround = landed;
-        x = (box.minX + box.maxX) / 2;
-        z = (box.minZ + box.maxZ) / 2;
-        y = box.minY + EYE;
     }
 
     // ------------------------------------------------------------------
