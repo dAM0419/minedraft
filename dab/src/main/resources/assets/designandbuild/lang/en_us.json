@@ -459,5 +459,6 @@
   "key.designandbuild.materials": "Projection: materials list",
   "key.designandbuild.stage_next": "Projection: next stage",
   "key.designandbuild.stage_prev": "Projection: previous stage",
-  "designandbuild.help.drag_vertical": "Move up / down only"
+  "designandbuild.help.drag_vertical": "Move up / down only",
+  "designandbuild.hud.work_pointer": "Work %s · %s blocks"
 }

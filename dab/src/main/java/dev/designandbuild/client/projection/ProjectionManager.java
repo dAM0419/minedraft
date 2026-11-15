@@ -75,6 +75,10 @@ public final class ProjectionManager {
     /** 겨눈 칸에 망치로 놓을 수 없으면 그 이유 (조준점 아래에 띄운다). 놓을 수 있으면 null. */
     @Nullable
     public static net.minecraft.network.chat.Component hammerHint;
+    /** 지금 해야 할 가장 가까운 칸 (화면 가장자리 방향 표시용, 없으면 null). 0.5초마다 다시 찾는다. */
+    @org.jetbrains.annotations.Nullable
+    public static net.minecraft.core.BlockPos workTarget;
+    public static int workCount;
     /** 서버에 마지막으로 보낸 보기 상태 (같으면 다시 안 보냄). sentViewValid = false 면 아직 안 보냄. */
     private static boolean sentViewValid, sentViewOn;
     @Nullable
@@ -156,6 +160,7 @@ public final class ProjectionManager {
             }
         }
         if (subscribed == null) {
+            workTarget = null;
             hammerTarget = null;
             hammerHint = null;
             sendView(null);
@@ -194,6 +199,11 @@ public final class ProjectionManager {
                 : null;
         updateHammerHint(p, level);
         ProjectionRenderer.update(p);
+        if (tick % 10 == 0) {
+            long w = p.nearestWork(player.getX(), player.getEyeY(), player.getZ());
+            workTarget = w == Long.MIN_VALUE ? null : net.minecraft.core.BlockPos.of(w);
+            workCount = p.workCount;
+        }
         if (++materialsAge >= 10) {
             materialsAge = 0;
             // 지금 보이는 목록 하나만 센다 (펼침 방식을 바꾸면 바로 다시 센다)

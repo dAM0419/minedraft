@@ -13,6 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.Mth;
@@ -48,6 +49,86 @@ public final class ProjectionHud {
         renderProgress(g, mc, p);
         renderMaterials(g, mc, p, player);
         renderHammerHint(g, mc);
+        renderWorkPointer(g, mc, player);
+    }
+
+    // ------------------------------------------------------------------
+    // 할 일 방향: 가장 가까운 할 일 칸이 화면 밖이면 가장자리에 화살표, 안이면 그 자리에 표시
+    // ------------------------------------------------------------------
+
+    private static final int POINTER_COLOR = 0xFF5FD0C0, POINTER_MARGIN = 28;
+
+    private static void renderWorkPointer(GuiGraphics g, Minecraft mc, LocalPlayer player) {
+        BlockPos t = ProjectionManager.workTarget;
+        if (t == null || mc.screen != null) return;
+        int w = g.guiWidth(), h = g.guiHeight();
+        float[] s = ProjectionRenderer.toScreen(t.getX() + 0.5, t.getY() + 0.5, t.getZ() + 0.5, w, h);
+        if (s == null) return;
+        double dist = Math.sqrt(player.distanceToSqr(t.getX() + 0.5, t.getY() + 0.5, t.getZ() + 0.5));
+        String label = (dist < 10 ? String.format("%.1f", dist) : String.valueOf((int) Math.round(dist))) + "m";
+        Font font = mc.font;
+        float cx = w / 2.0F, cy = h / 2.0F;
+        boolean onScreen = s[2] > 0 && s[0] >= POINTER_MARGIN && s[0] <= w - POINTER_MARGIN && s[1] >= POINTER_MARGIN && s[1] <= h - POINTER_MARGIN;
+        if (onScreen) {
+            // 화면 안: 작은 마름모와 거리 (가까우면 생략 — 유령 블록이 이미 보인다)
+            if (dist < 6) return;
+            int x = (int) s[0], y = (int) s[1];
+            diamond(g, x, y, 4, 0xC0000000);
+            diamond(g, x, y, 3, POINTER_COLOR);
+            int lw = font.width(label);
+            g.fill(x - lw / 2 - 2, y + 6, x + lw / 2 + 2, y + 16, 0xA0000000);
+            g.drawString(font, label, x - lw / 2, y + 7, POINTER_COLOR, false);
+            return;
+        }
+        // 화면 밖 (뒤쪽이면 방향을 뒤집는다): 가운데에서 그 방향으로 가다 가장자리에 닿는 곳
+        float dx = s[0] - cx, dy = s[1] - cy;
+        if (s[2] < 0) {
+            dx = -dx;
+            dy = -dy;
+        }
+        float len = (float) Math.sqrt(dx * dx + dy * dy);
+        if (len < 1.0E-3F) {
+            dx = 0;
+            dy = 1;
+        } else {
+            dx /= len;
+            dy /= len;
+        }
+        float hw = cx - POINTER_MARGIN, hh = cy - POINTER_MARGIN;
+        float k = Math.min(Math.abs(dx) > 1.0E-4F ? hw / Math.abs(dx) : Float.MAX_VALUE, Math.abs(dy) > 1.0E-4F ? hh / Math.abs(dy) : Float.MAX_VALUE);
+        float ax = cx + dx * k, ay = cy + dy * k;
+        g.pose().pushPose();
+        g.pose().translate(ax, ay, 0);
+        g.pose().mulPose(com.mojang.math.Axis.ZP.rotation((float) Math.atan2(dy, dx)));
+        arrow(g, 1, 0xC0000000);
+        arrow(g, 0, POINTER_COLOR);
+        g.pose().popPose();
+        // 거리·남은 칸: 화살표 안쪽에
+        Component text = Component.translatable("designandbuild.hud.work_pointer", label, ProjectionManager.workCount);
+        int tw = font.width(text);
+        int tx = (int) Mth.clamp(ax - dx * 26 - tw / 2.0F, 4, w - tw - 4);
+        int ty = (int) Mth.clamp(ay - dy * 22 - 4, 4, h - 12);
+        g.fill(tx - 2, ty - 2, tx + tw + 2, ty + 10, 0xA0000000);
+        g.drawString(font, text, tx, ty, POINTER_COLOR, false);
+    }
+
+    /** x 축 방향 화살표 (끝이 원점). grow 만큼 두껍게 (테두리). */
+    private static void arrow(GuiGraphics g, int grow, int color) {
+        int head = 9;
+        g.fill(-22 - grow, -2 - grow, -head + 1, 2 + grow, color);
+        for (int i = 0; i <= head + grow; i++) {
+            int x = -head + i - grow;
+            int hw = head - i + grow;
+            if (hw < 0) break;
+            g.fill(x, -hw, x + 1, hw + 1, color);
+        }
+    }
+
+    private static void diamond(GuiGraphics g, int x, int y, int r, int color) {
+        for (int i = -r; i <= r; i++) {
+            int hw = r - Math.abs(i);
+            g.fill(x - hw, y + i, x + hw + 1, y + i + 1, color);
+        }
     }
 
     /** 망치로 겨눈 칸을 못 놓으면 조준점 아래에 이유. */

@@ -126,6 +126,23 @@ public final class ProjectionRenderer {
         return st == null ? net.minecraft.world.level.block.Blocks.AIR.defaultBlockState() : st;
     });
 
+    static final Matrix4f LAST_VIEW = new Matrix4f(), LAST_PROJ = new Matrix4f();
+    @Nullable
+    static Vec3 lastCam;
+
+    /** 월드 좌표를 GUI 화면 좌표로: {x, y, 앞쪽이면 1 / 뒤쪽이면 -1}. 아직 그린 적 없으면 null. */
+    @Nullable
+    static float[] toScreen(double x, double y, double z, int guiW, int guiH) {
+        Vec3 cam = lastCam;
+        if (cam == null) return null;
+        org.joml.Vector4f v = new org.joml.Vector4f((float) (x - cam.x), (float) (y - cam.y), (float) (z - cam.z), 1.0F);
+        LAST_VIEW.transform(v);
+        LAST_PROJ.transform(v);
+        if (Math.abs(v.w) < 1.0E-5F) return null;
+        float nx = v.x / v.w, ny = v.y / v.w;
+        return new float[]{(nx + 1) * 0.5F * guiW, (1 - ny) * 0.5F * guiH, v.w > 0 ? 1 : -1};
+    }
+
     public static void clear() {
         for (SectionVisual v : VISUALS.values()) v.close();
         VISUALS.clear();
@@ -308,6 +325,10 @@ public final class ProjectionRenderer {
 
     public static void render(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        // 화면 가장자리 방향 표시가 쓰도록 이 프레임의 행렬을 남긴다
+        LAST_VIEW.set(event.getModelViewMatrix());
+        LAST_PROJ.set(event.getProjectionMatrix());
+        lastCam = event.getCamera().getPosition();
         if (VISUALS.isEmpty() || owner == null || ProjectionManager.active() != owner) return;
         Camera camera = event.getCamera();
         Vec3 cam = camera.getPosition();
@@ -361,19 +382,35 @@ public final class ProjectionRenderer {
     }
 
     /** 유령 블록의 블록 엔티티 렌더러 (Ponder 처럼): 유령 버퍼에 같이 그려 함께 반투명해진다. */
-    private static void drawGhostBlockEntities(List<SectionVisual> visible, Matrix4f view, Vec3 cam) {
+    private static void drawGhostBlockEntities(List<SectionVisual> visible, Matrix4f view, Matrix4f proj, Vec3 cam) {
+        boolean any = false;
+        for (SectionVisual v : visible) if (v.entities.length > 0) any = true;
+        if (!any) return;
         Minecraft mc = Minecraft.getInstance();
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
+        buffers.endBatch(); // 앞서 쌓인 것은 원래 행렬로 먼저 비운다
+        // 카메라 회전은 모델뷰 행렬에만 둔다 (바닐라와 같게). 포즈에도 넣으면 두 번 돌아가 화면을 따라 움직인다
+        Matrix4fStack mvs = RenderSystem.getModelViewStack();
+        mvs.pushMatrix();
+        mvs.set(view);
+        RenderSystem.applyModelViewMatrix();
+        RenderSystem.backupProjectionMatrix();
+        RenderSystem.setProjectionMatrix(proj, VertexSorting.DISTANCE_TO_ORIGIN);
+        com.mojang.blaze3d.platform.Lighting.setupLevel();
         com.mojang.blaze3d.vertex.PoseStack pose = new com.mojang.blaze3d.vertex.PoseStack();
-        pose.last().pose().set(view);
-        pose.last().normal().set(new org.joml.Matrix3f(view));
         float pt = mc.getTimer().getGameTimeDeltaPartialTick(false);
         int left = MAX_GHOST_BLOCK_ENTITIES;
-        for (SectionVisual v : visible) {
-            if (v.entities.length == 0 || left <= 0) continue;
-            left -= GHOST_BE.render(v.entities, pose, buffers, cam.x, cam.y, cam.z, pt, left);
+        try {
+            for (SectionVisual v : visible) {
+                if (v.entities.length == 0 || left <= 0) continue;
+                left -= GHOST_BE.render(v.entities, pose, buffers, cam.x, cam.y, cam.z, pt, left);
+            }
+            buffers.endBatch();
+        } finally {
+            RenderSystem.restoreProjectionMatrix();
+            mvs.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
-        buffers.endBatch();
     }
 
     /** 주 화면 깊이를 복사한 별도 버퍼에 불투명하게 그리고 (겹친 면은 깊이로 가려짐), 결과를 반투명하게 덮는다. */
@@ -399,7 +436,7 @@ public final class ProjectionRenderer {
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(true);
         drawGhostLayers(visible, view, proj, cam);
-        drawGhostBlockEntities(visible, view, cam);
+        drawGhostBlockEntities(visible, view, proj, cam);
         GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFbo);
         GlStateManager._viewport(0, 0, main.viewWidth, main.viewHeight);
 

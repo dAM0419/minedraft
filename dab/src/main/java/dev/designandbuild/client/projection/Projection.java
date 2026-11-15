@@ -752,6 +752,29 @@ public final class Projection {
     // 표시할 칸
     // ------------------------------------------------------------------
 
+    /** 지금 보이는 할 일 칸 중 (x,y,z) 에서 가장 가까운 칸 (없으면 Long.MIN_VALUE). 할 일 칸 수는 workCount 에. */
+    long nearestWork(double x, double y, double z) {
+        long best = Long.MIN_VALUE;
+        double bestD = Double.MAX_VALUE;
+        int count = 0;
+        for (int i = 0; i < n; i++) {
+            if (!inView(i)) continue;
+            count++;
+            long p = pos[i];
+            double dx = BlockPos.getX(p) + 0.5 - x, dy = BlockPos.getY(p) + 0.5 - y, dz = BlockPos.getZ(p) + 0.5 - z;
+            double d = dx * dx + dy * dy + dz * dz;
+            if (d < bestD) {
+                bestD = d;
+                best = p;
+            }
+        }
+        workCount = count;
+        return best;
+    }
+
+    /** {@link #nearestWork} 가 센 할 일 칸 수. */
+    int workCount;
+
     /** 지금 단계·층 보기 기준으로 이 칸을 그리는가. */
     boolean inView(int i) {
         if (cur >= stageCount || curLayer == NO_LAYER) return false;
