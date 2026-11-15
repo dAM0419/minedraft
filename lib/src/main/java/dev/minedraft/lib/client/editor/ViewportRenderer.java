@@ -280,6 +280,17 @@ public final class ViewportRenderer {
             Ui.text(g, name, x, y, EditorColors.editorColor(c.player()));
         }
         screen.render2DExtras(g, mx, my);
+        // 몰입형: 움직일 수 없으면 까닭을 조준점 아래에
+        if (imm) {
+            String why = screen.immersive.blockedReason();
+            if (why != null) {
+                Component t = Component.translatable(why);
+                int w = Ui.font().width(t);
+                int x = screen.vpX + screen.vpW / 2 - w / 2, y = screen.vpY + screen.vpH / 2 + 14;
+                g.fill(x - 3, y - 2, x + w + 3, y + 10, 0xC0000000);
+                Ui.text(g, t, x, y, 0xFFFFC857);
+            }
+        }
         // 태그 범위 화살표 (블록에 가리지 않게 2D 로 맨 위에)
         if (screen.tagTool.active && !imm) screen.drawRangeArrows(g);
         // 섹션 굽는 중

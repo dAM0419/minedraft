@@ -456,6 +456,8 @@ public abstract class AreaEditorScreen extends Screen {
             setImmersive(false);
         }
         if (immersive.active) {
+            // 몰입형에서 마우스를 잡으면 입력칸에 글을 쓸 수 없으니, 창 없이 남은 입력칸 포커스는 풀어 둔다 (멈춤 방지)
+            if (modal == null && focused != null) unfocus(true);
             immersive.updateGrab(modal == null && focused == null);
             immersive.tick();
         } else {

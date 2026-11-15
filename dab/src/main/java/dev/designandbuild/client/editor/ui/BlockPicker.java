@@ -481,6 +481,12 @@ public final class BlockPicker extends Modal<EditorScreen> {
             close();
             return true;
         }
+        // 몰입형에서 E 로 열었으니 E 로 닫는다 (JEI 검색칸에 글을 쓰는 중이 아니면)
+        if (screen.immersive.active && Minecraft.getInstance().options.keyInventory.matches(key, scan)
+                && (jeiMode ? !JeiState.keyboardFocus() : search.getValue().isEmpty())) {
+            close();
+            return true;
+        }
         if (jeiMode) return true;
         if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
             refilter();

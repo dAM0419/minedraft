@@ -100,6 +100,8 @@ public final class ImmersiveView {
         Minecraft mc = Minecraft.getInstance();
         long win = mc.getWindow().getWindow();
         boolean want = active && wantGrab && mc.isWindowActive();
+        // 창을 닫은 클릭이 아직 눌려 있으면 다 뗄 때까지 기다린다 (그 클릭이 몰입형 클릭으로 넘어오지 않게)
+        if (want && !grabbed && anyMouseDown(win)) return;
         if (want && !grabbed) {
             GLFW.glfwSetInputMode(win, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
             double[] mx = new double[1], my = new double[1];
@@ -110,6 +112,27 @@ public final class ImmersiveView {
         } else if (!want && grabbed) {
             release();
         }
+    }
+
+    private static boolean anyMouseDown(long win) {
+        for (int b = GLFW.GLFW_MOUSE_BUTTON_1; b <= GLFW.GLFW_MOUSE_BUTTON_3; b++) {
+            if (GLFW.glfwGetMouseButton(win, b) == GLFW.GLFW_PRESS) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 지금 움직일 수 없는 까닭 (번역 키, 없으면 null). 몰입형 화면 가운데에 띄워 멈춘 까닭을 알 수 있게 한다.
+     */
+    @org.jetbrains.annotations.Nullable
+    String blockedReason() {
+        if (!active) return null;
+        if (screen.modal != null) return null; // 창이 떠 있는 건 눈에 보인다
+        if (screen.focusedBox() != null) return "minedraftlib.immersive.blocked_focus";
+        Minecraft mc = Minecraft.getInstance();
+        if (!mc.isWindowActive()) return "minedraftlib.immersive.blocked_window";
+        if (!grabbed) return "minedraftlib.immersive.blocked_mouse";
+        return null;
     }
 
     void release() {
