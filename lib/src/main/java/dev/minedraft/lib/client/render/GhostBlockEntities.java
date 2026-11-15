@@ -100,6 +100,7 @@ public final class GhostBlockEntities {
             }
             be.setLevel(lv);
             map.put(key, be);
+            warmUp(lv, be); // 등록한 뒤에 (서로 찾는 블록 엔티티끼리 다시 만들지 않게)
             return be;
         } catch (Throwable t) {
             failed.add(key);
@@ -144,6 +145,21 @@ public final class GhostBlockEntities {
             pose.popPose();
         }
         return n;
+    }
+
+    /** 새 블록 엔티티를 몇 번 틱한다. 시작 대기 틱이 지나야 이웃과 연결되는 것이 있다 (Create 동력 축 ↔ 증기기관 크랭크). */
+    private static final int WARMUP_TICKS = 4;
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static void warmUp(net.minecraft.world.level.Level level, BlockEntity be) {
+        try {
+            BlockState st = be.getBlockState();
+            net.minecraft.world.level.block.entity.BlockEntityTicker ticker = st.getTicker(level, be.getType());
+            if (ticker == null) return;
+            for (int i = 0; i < WARMUP_TICKS; i++) ticker.tick(level, be.getBlockPos(), st, be);
+        } catch (Throwable ignored) {
+            // 진짜 월드를 가정한 틱: 데우지 않은 채로 둔다
+        }
     }
 
     public void clear() {

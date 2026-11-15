@@ -126,6 +126,8 @@ public final class EditorBlockEntities {
             return null;
         }
         if (byChunk.computeIfAbsent(chunk, c -> new Long2ObjectOpenHashMap<>()).put(key, be) == null) size++;
+        FakeLevel lv = level();
+        if (lv != null) dev.minedraft.lib.client.render.GhostBlockEntities.warmUp(lv, be); // 등록한 뒤에 데운다
         return be;
     }
 
