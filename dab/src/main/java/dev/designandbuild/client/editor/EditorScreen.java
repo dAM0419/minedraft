@@ -183,124 +183,44 @@ public final class EditorScreen extends AreaEditorScreen {
         return sel == null || sel.get(pos) == null;
     }
 
-    // ---- 구조물 범위 손잡이 (공간 지정 · 구조물 태그 · 구조물 선택 중) ----
-    private static final Direction[] FACES = Direction.values();
-    /** 한 번에 범위로 다룰 수 있는 최대 칸 수 (상자 부피). */
-    private static final long MAX_RESIZE_VOLUME = 2_000_000L;
-    private int handleFace = -1;
-    @Nullable
-    private Box handleStart;
-    private double handleMx, handleMy;
-    private int handleDelta;
+    // ---- 구조물 범위 손잡이: 손잡이 UI 는 Lib, 어떤 범위·어떻게 넣고 빼는지는 DaB ----
 
-    /** 범위 손잡이를 보일 구조물 범위 (조건이 아니면 null). */
+    @Override
     @Nullable
-    private Box resizableBox() {
-        if (!tagTool.active || immersive.active || tagTool.current() != dev.designandbuild.core.DabTags.STRUCTURE || s.selected == 0) return null;
+    protected Box tagRangeBox() {
+        if (!tagTool.active || tagTool.current() != dev.designandbuild.core.DabTags.STRUCTURE || s.selected == 0) return null;
         StructureInstance st = s.model.structure(s.selected);
         return st == null ? null : st.bounds();
     }
 
-    private static double[] faceCenter(Box b, Direction d) {
-        double cx = (b.minX() + b.maxX() + 1) / 2.0, cy = (b.minY() + b.maxY() + 1) / 2.0, cz = (b.minZ() + b.maxZ() + 1) / 2.0;
-        switch (d) {
-            case EAST -> cx = b.maxX() + 1;
-            case WEST -> cx = b.minX();
-            case UP -> cy = b.maxY() + 1;
-            case DOWN -> cy = b.minY();
-            case SOUTH -> cz = b.maxZ() + 1;
-            default -> cz = b.minZ();
-        }
-        return new double[]{cx, cy, cz};
-    }
-
-    /** 면 d 를 바깥으로 delta 칸 (음수면 안쪽으로). 두께는 1칸 아래로 줄지 않는다. */
-    private static Box resized(Box b, Direction d, int delta) {
-        int x0 = b.minX(), y0 = b.minY(), z0 = b.minZ(), x1 = b.maxX(), y1 = b.maxY(), z1 = b.maxZ();
-        switch (d) {
-            case EAST -> x1 = Math.max(x0, x1 + delta);
-            case WEST -> x0 = Math.min(x1, x0 - delta);
-            case UP -> y1 = Math.max(y0, y1 + delta);
-            case DOWN -> y0 = Math.min(y1, y0 - delta);
-            case SOUTH -> z1 = Math.max(z0, z1 + delta);
-            default -> z0 = Math.min(z1, z0 - delta);
-        }
-        return new Box(x0, y0, z0, x1, y1, z1);
-    }
-
-    /** 커서 근처(8픽셀)의 손잡이 면 번호 (-1 = 없음). */
-    private int hoveredFace(Box b, double mx, double my) {
-        int best = -1;
-        double bestD = 64;
-        for (int i = 0; i < FACES.length; i++) {
-            double[] c = faceCenter(b, FACES[i]);
-            org.joml.Vector3f p = s.camera.project(c[0], c[1], c[2]);
-            double d = (p.x - mx) * (p.x - mx) + (p.y - my) * (p.y - my);
-            if (d < bestD) {
-                bestD = d;
-                best = i;
-            }
-        }
-        return best;
-    }
-
-    /** 지금 보여 줄 범위 (끄는 중이면 바뀐 범위). */
-    @Nullable
-    private Box shownResizeBox() {
-        if (handleFace >= 0 && handleStart != null) return resized(handleStart, FACES[handleFace], handleDelta);
-        return resizableBox();
+    @Override
+    protected int tagRangeColor() {
+        return 0xFF000000 | dev.designandbuild.core.DabTags.STRUCTURE.color();
     }
 
     @Override
-    protected boolean tagToolPressed(double mx, double my, int button, @Nullable AreaEditorSession.Hit h) {
-        Box b = resizableBox();
-        if (b == null || button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
-        int f = hoveredFace(b, mx, my);
-        if (f < 0) return false;
-        handleFace = f;
-        handleStart = b;
-        handleMx = mx;
-        handleMy = my;
-        handleDelta = 0;
-        return true;
+    protected Component tagRangeSizeLabel(Box b) {
+        return Component.translatable("designandbuild.tag.range_size", b.sizeX(), b.sizeY(), b.sizeZ());
     }
 
     @Override
-    protected boolean tagToolDragged(double mx, double my, int button) {
-        if (handleFace < 0 || handleStart == null) return false;
-        Direction d = FACES[handleFace];
-        double[] c = faceCenter(handleStart, d);
-        org.joml.Vector3f p0 = s.camera.project(c[0], c[1], c[2]);
-        org.joml.Vector3f p1 = s.camera.project(c[0] + d.getStepX(), c[1] + d.getStepY(), c[2] + d.getStepZ());
-        double dx = p1.x - p0.x, dy = p1.y - p0.y, len2 = dx * dx + dy * dy;
-        if (len2 < 1) return true; // 이 축이 화면을 향해 있다: 옆에서 보고 끌어야 한다
-        handleDelta = (int) Math.round(((mx - handleMx) * dx + (my - handleMy) * dy) / len2);
-        return true;
+    protected Component tagRangeReleaseHint() {
+        return Component.translatable("designandbuild.tag.range_release");
     }
 
     @Override
-    protected boolean tagToolReleased(double mx, double my, int button) {
-        if (handleFace < 0 || handleStart == null) return false;
-        Box nb = resized(handleStart, FACES[handleFace], handleDelta);
-        handleFace = -1;
-        handleStart = null;
-        handleDelta = 0;
-        applyStructureRange(nb);
-        return true;
+    protected Component tagRangeHandleHint() {
+        return Component.translatable("designandbuild.tag.range_handle");
     }
 
     /**
      * 구조물 범위를 nb 로: 상자 안의 블록(설계가 있으면 설계, 없으면 월드)은 모두 구조물에 넣고, 상자 밖의 구조물 칸은 뺀다.
      * 일부만 칠한 뒤 손잡이로 늘리면 그 안의 블록이 한 번에 들어간다. 되돌리기 한 번.
      */
-    private void applyStructureRange(Box nb) {
+    @Override
+    protected void applyTagRange(Box nb) {
         StructureInstance st = s.model.structure(s.selected);
         if (st == null) return;
-        long vol = (long) nb.sizeX() * nb.sizeY() * nb.sizeZ();
-        if (vol > MAX_RESIZE_VOLUME) {
-            s.toast(Component.translatable("designandbuild.msg.range_too_big", MAX_RESIZE_VOLUME));
-            return;
-        }
         it.unimi.dsi.fastutil.longs.LongArrayList pos = new it.unimi.dsi.fastutil.longs.LongArrayList();
         List<BlockState> states = new java.util.ArrayList<>();
         for (int x = nb.minX(); x <= nb.maxX(); x++)
@@ -320,44 +240,6 @@ public final class EditorScreen extends AreaEditorScreen {
         }
         if (pos.isEmpty()) return;
         s.send(new Requests.StructCells(ClientAreas.nextGroup(), s.selected, "", pos.toLongArray(), states.toArray(new BlockState[0])));
-    }
-
-    @Override
-    protected void drawTagToolLines(com.mojang.blaze3d.vertex.VertexConsumer lines, com.mojang.blaze3d.vertex.PoseStack ps,
-                                    double tx, double ty, double tz) {
-        Box b = shownResizeBox();
-        if (b == null) return;
-        int color = 0xFF000000 | dev.designandbuild.core.DabTags.STRUCTURE.color();
-        dev.minedraft.lib.client.editor.ViewportRenderer.box(lines, ps, b, tx, ty, tz, color);
-        int hovered = handleFace >= 0 ? handleFace : hoveredFace(b, mouseX(), mouseY());
-        for (int i = 0; i < FACES.length; i++) {
-            double[] c = faceCenter(b, FACES[i]);
-            double r = i == hovered ? 0.3 : 0.18;
-            float a = i == hovered ? 1.0F : 0.75F;
-            net.minecraft.client.renderer.LevelRenderer.renderLineBox(ps, lines, c[0] - r - tx, c[1] - r - ty, c[2] - r - tz,
-                    c[0] + r - tx, c[1] + r - ty, c[2] + r - tz, 1.0F, 1.0F, 1.0F, a);
-        }
-    }
-
-    @Override
-    protected boolean tagBrushVisible() {
-        Box b = resizableBox();
-        return handleFace < 0 && (b == null || hoveredFace(b, mouseX(), mouseY()) < 0);
-    }
-
-    @Override
-    @Nullable
-    protected List<Component> tagToolChip() {
-        if (handleFace >= 0) {
-            Box nb = shownResizeBox();
-            return nb == null ? null : List.of(Component.translatable("designandbuild.tag.range_size", nb.sizeX(), nb.sizeY(), nb.sizeZ()),
-                    Component.translatable("designandbuild.tag.range_release"));
-        }
-        Box b = resizableBox();
-        if (b != null && hoveredFace(b, mouseX(), mouseY()) >= 0) {
-            return List.of(Component.translatable("designandbuild.tag.range_handle"));
-        }
-        return null;
     }
 
     /**

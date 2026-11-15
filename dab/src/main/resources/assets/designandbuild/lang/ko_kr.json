@@ -206,7 +206,6 @@
   "designandbuild.msg.pick_material": "재료를 먼저 고르세요",
   "designandbuild.msg.pick_structure": "라이브러리에서 구조물을 고르세요",
   "designandbuild.msg.place_nothing": "여기에는 적용할 칸이 없습니다",
-  "designandbuild.msg.range_too_big": "범위가 너무 큽니다 (최대 %s칸)",
   "designandbuild.msg.structure_gone": "그 구조물은 이미 없습니다",
   "designandbuild.msg.table_changed": "테이블의 도면이 바뀌어 편집창을 닫았습니다",
   "designandbuild.msg.too_far": "테이블에서 너무 멉니다",

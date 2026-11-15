@@ -180,10 +180,13 @@ public final class ViewportRenderer {
             screen.drawSolidLines(solidLines, ps, tx, ty, tz);
         } else {
             // 공간 지정 붓과 모드가 더하는 선
-            if (screen.hover != null && screen.tagBrushVisible()) {
+            if (screen.hover != null && screen.tagBrushVisible() && screen.rangeBrushVisible()) {
                 box(solidLines, ps, screen.tagTool.brushBox(screen.hover.pos()), tx, ty, tz, screen.tagTool.color());
             }
-            if (!imm) screen.drawTagToolLines(solidLines, ps, tx, ty, tz);
+            if (!imm) {
+                screen.drawTagToolLines(solidLines, ps, tx, ty, tz);
+                screen.drawRangeHandles(solidLines, ps, tx, ty, tz);
+            }
         }
         // 단면 예외 칸 (단면을 켠 뒤 놓아서 잘린 쪽인데도 보이는 칸): 옅은 청록 테두리
         int exemptColor = Ui.withAlpha(Ui.ACCENT, 110);

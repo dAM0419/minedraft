@@ -53,7 +53,7 @@ import java.util.UUID;
 public abstract class AreaEditorScreen extends Screen {
     public static final int TOP = 16, LEFT = 22;
 
-    private final AreaEditorSession base;
+    final AreaEditorSession base;
     public final TopBar topBar;
     public final ToolBar toolBar;
     public final SidePanel sidePanel;
@@ -240,6 +240,41 @@ public abstract class AreaEditorScreen extends Screen {
     protected boolean paintTags(dev.minedraft.lib.space.TagGroup group, @Nullable dev.minedraft.lib.space.SpaceTag tag, long[] pos,
                                 int undoGroup) {
         return false;
+    }
+
+    // ---- 태그 범위 손잡이 (공통) ----
+    /** 한 번에 범위로 다룰 수 있는 최대 칸 수 (상자 부피). */
+    public static final long MAX_RANGE_VOLUME = 2_000_000L;
+    private final RangeHandles rangeHandles = new RangeHandles(this);
+
+    /** 범위 손잡이를 보일 상자 (모드가 지금 선택된 태그 영역의 범위를 돌려준다. null = 손잡이 없음). */
+    @Nullable
+    protected Box tagRangeBox() {
+        return null;
+    }
+
+    /** 범위 상자 선 색 (0xAARRGGBB). */
+    protected int tagRangeColor() {
+        return 0xFFFFFFFF;
+    }
+
+    /** 끌어서 범위를 바꿨다. 모드가 그 안팎의 칸을 태그에 넣고 빼는 요청을 보낸다 (되돌리기 한 번). */
+    protected void applyTagRange(Box newRange) {
+    }
+
+    /** 끄는 중 커서 옆 첫 줄 (범위 크기). */
+    protected Component tagRangeSizeLabel(Box b) {
+        return Component.translatable("minedraftlib.tag.range_size", b.sizeX(), b.sizeY(), b.sizeZ());
+    }
+
+    /** 끄는 중 커서 옆 둘째 줄 (놓으면 어떻게 되는지). */
+    protected Component tagRangeReleaseHint() {
+        return Component.translatable("minedraftlib.tag.range_release");
+    }
+
+    /** 손잡이 위에 커서가 있을 때 설명. */
+    protected Component tagRangeHandleHint() {
+        return Component.translatable("minedraftlib.tag.range_handle");
     }
 
     /** 공간 지정 도구로 뷰포트를 눌렀다: 모드가 받으면 true (칠하기를 시작하지 않는다. 예: DaB 구조물 범위 손잡이). */
@@ -503,10 +538,25 @@ public abstract class AreaEditorScreen extends Screen {
     }
 
     /** 커서 설명: 공간 지정 도구면 Lib 이, 아니면 모드가. */
+    /** 뷰포트 렌더러용: 범위 손잡이를 그리고, 붓을 숨길지 알려 준다. */
+    final void drawRangeHandles(com.mojang.blaze3d.vertex.VertexConsumer lines, com.mojang.blaze3d.vertex.PoseStack ps,
+                                double tx, double ty, double tz) {
+        rangeHandles.draw(lines, ps, tx, ty, tz);
+    }
+
+    final boolean rangeBrushVisible() {
+        return !rangeHandles.dragging() && !rangeHandles.overHandle();
+    }
+
     final List<Component> chipLines() {
         if (tagTool.active) {
             List<Component> custom = tagToolChip();
             if (custom != null) return custom;
+            if (rangeHandles.dragging()) {
+                Box nb = rangeHandles.shown();
+                if (nb != null) return List.of(tagRangeSizeLabel(nb), tagRangeReleaseHint());
+            }
+            if (rangeHandles.overHandle()) return List.of(tagRangeHandleHint());
             return hover != null ? tagTool.chip(hover) : List.of();
         }
         return cursorChip();
@@ -723,7 +773,7 @@ public abstract class AreaEditorScreen extends Screen {
         }
         if (tagTool.active) {
             if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !cutClick(h)) {
-                if (!tagToolPressed(mx, my, button, h)) tagTool.clicked(button, h);
+                if (!tagToolPressed(mx, my, button, h) && !rangeHandles.pressed(mx, my, button)) tagTool.clicked(button, h);
             }
             return true;
         }
@@ -765,7 +815,15 @@ public abstract class AreaEditorScreen extends Screen {
             if (!rightDragged) rightClicked(mx, my);
             return true;
         }
-        if (tagTool.active) tagToolReleased(mx, my, button);
+        if (tagTool.active) {
+            tagToolReleased(mx, my, button);
+            Box nb = rangeHandles.released();
+            if (nb != null) {
+                long vol = (long) nb.sizeX() * nb.sizeY() * nb.sizeZ();
+                if (vol > MAX_RANGE_VOLUME) base.toast(Component.translatable("minedraftlib.msg.range_too_big", MAX_RANGE_VOLUME));
+                else applyTagRange(nb);
+            }
+        }
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && tagTool.isStroking()) tagTool.released();
         viewportReleased(mx, my, button);
         return true;
@@ -800,7 +858,7 @@ public abstract class AreaEditorScreen extends Screen {
             }
             return true;
         }
-        if (tagTool.active && tagToolDragged(mx, my, button)) return true;
+        if (tagTool.active && (tagToolDragged(mx, my, button) || rangeHandles.dragged(mx, my))) return true;
         viewportDragged(mx, my, button);
         return true;
     }

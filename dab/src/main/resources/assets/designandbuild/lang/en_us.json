@@ -206,7 +206,6 @@
   "designandbuild.msg.pick_material": "Choose a material first",
   "designandbuild.msg.pick_structure": "Pick a structure in the library",
   "designandbuild.msg.place_nothing": "No cell to apply here",
-  "designandbuild.msg.range_too_big": "Range too large (up to %s cells)",
   "designandbuild.msg.structure_gone": "That structure no longer exists",
   "designandbuild.msg.table_changed": "The blueprint left the table, so the editor closed",
   "designandbuild.msg.too_far": "Too far from the table",
