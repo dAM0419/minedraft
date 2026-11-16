@@ -306,6 +306,11 @@ public abstract class AreaEditorScreen extends Screen {
         return null;
     }
 
+    /** 개체 묶음의 개체를 화면에 부르는 이름 (기본 "#번호"). 모드가 자기 이름(구역 이름 등)으로 바꾼다. */
+    public String tagInstanceName(net.minecraft.resources.ResourceLocation group, int instance) {
+        return "#" + instance;
+    }
+
     /** 공간 지정 도구 켜기·끄기. 모드가 자기 도구로 바꿀 때 false 로 부른다. */
     public void setTagTool(boolean on) {
         tagTool.setActive(on);

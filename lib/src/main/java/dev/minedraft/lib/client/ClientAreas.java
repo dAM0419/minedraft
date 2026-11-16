@@ -28,6 +28,7 @@ public final class ClientAreas {
     private static final List<Consumer<Area>> REPLACE_LISTENERS = new ArrayList<>();
     @Nullable
     private static ClientEditor editor;
+    private static boolean readOnly;
     private static int nextSeq = 1;
     private static int nextGroup = 1;
 
@@ -52,6 +53,11 @@ public final class ClientAreas {
     @Nullable
     public static ClientEditor editor() {
         return editor;
+    }
+
+    /** 열려 있는 편집창이 보기 전용인가 (편집 권한이 없다). 서버도 편집 요청을 거부한다. */
+    public static boolean readOnly() {
+        return editor != null && readOnly;
     }
 
     public static int nextSeq() {
@@ -115,12 +121,14 @@ public final class ClientAreas {
         for (Consumer<Area> l : REPLACE_LISTENERS) l.accept(a);
     }
 
-    static void open(Area a, BlockPos anchor) {
+    static void open(Area a, BlockPos anchor, boolean canEdit) {
         if (editor != null) editor.dispose();
         editor = null;
+        readOnly = !canEdit;
         BiFunction<Area, BlockPos, ClientEditor> opener = OPENERS.get(a.type.id());
         if (opener == null) return;
         editor = opener.apply(a, anchor);
+        if (readOnly && editor != null) editor.toast(Component.translatable("minedraftlib.msg.read_only"));
     }
 
     static void closeFromServer() {

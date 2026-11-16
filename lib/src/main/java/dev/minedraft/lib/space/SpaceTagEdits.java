@@ -28,8 +28,21 @@ public final class SpaceTagEdits {
     public static final ResourceLocation SET = MinedraftLib.rl("set_tags");
     public static final ResourceLocation DOMAIN = MinedraftLib.rl("space_tags");
 
-    /** 편집 요청: 한 묶음에서 칸들에 태그 하나를 칠한다 (tag null = 그 묶음 태그 지우기). group 은 되돌리기 묶음 번호. */
-    public record Paint(int group, long[] pos, ResourceLocation tagGroup, @Nullable SpaceTag tag) implements EditRequest {
+    /** {@link Paint#instance}: 새 개체를 만들어 넣는다. 같은 되돌리기 묶음(끌기 한 번)의 요청은 같은 새 개체에 들어간다. */
+    public static final int NEW_INSTANCE = -1;
+
+    /**
+     * 편집 요청: 한 묶음에서 칸들에 태그 하나를 칠한다 (tag null = 그 묶음 태그 지우기). group 은 되돌리기 묶음 번호.
+     * <p>
+     * instance 는 개체 묶음({@link TagGroup#instanced})에서만 뜻이 있다:
+     * 칠할 때는 넣을 개체 번호나 {@link #NEW_INSTANCE}, 지울 때는 0 = 어느 개체든, 번호 = 그 개체의 칸만.
+     * 다른 개체의 칸을 칠하면 그 칸이 이 개체로 옮겨 온다.
+     */
+    public record Paint(int group, long[] pos, ResourceLocation tagGroup, @Nullable SpaceTag tag, int instance) implements EditRequest {
+        public Paint(int group, long[] pos, ResourceLocation tagGroup, @Nullable SpaceTag tag) {
+            this(group, pos, tagGroup, tag, 0);
+        }
+
         @Override
         public ResourceLocation type() {
             return PAINT;
@@ -41,11 +54,16 @@ public final class SpaceTagEdits {
             CellIO.writePositions(buf, pos);
             buf.writeResourceLocation(tagGroup);
             SpaceTag.write(buf, tag);
+            buf.writeVarInt(instance);
         }
     }
 
-    /** 확정 연산: 한 묶음에서 칸마다 태그 (null = 지움). */
-    public record Set(ResourceLocation tagGroup, long[] pos, SpaceTag[] tags) implements AreaOp {
+    /** 확정 연산: 한 묶음에서 칸마다 태그 (null = 지움) 와 개체 번호 (inst null = 모두 0). */
+    public record Set(ResourceLocation tagGroup, long[] pos, SpaceTag[] tags, @Nullable int[] inst) implements AreaOp {
+        public Set(ResourceLocation tagGroup, long[] pos, SpaceTag[] tags) {
+            this(tagGroup, pos, tags, null);
+        }
+
         @Override
         public ResourceLocation type() {
             return SET;
@@ -54,7 +72,7 @@ public final class SpaceTagEdits {
         @Override
         public void apply(Area area) {
             SpaceTagLayer l = SpaceTagLayer.of(area);
-            if (l != null) l.set(tagGroup, pos, tags);
+            if (l != null) l.set(tagGroup, pos, tags, inst);
         }
 
         @Override
@@ -62,10 +80,13 @@ public final class SpaceTagEdits {
             buf.writeResourceLocation(tagGroup);
             CellIO.writePositions(buf, pos);
             for (SpaceTag t : tags) SpaceTag.write(buf, t);
+            buf.writeBoolean(inst != null);
+            if (inst != null) for (int i : inst) buf.writeVarInt(i);
         }
     }
 
-    record TagChange(ResourceLocation tagGroup, long pos, @Nullable SpaceTag before, @Nullable SpaceTag after) implements UndoChange {
+    record TagChange(ResourceLocation tagGroup, long pos, @Nullable SpaceTag before, @Nullable SpaceTag after,
+                     int beforeInst, int afterInst) implements UndoChange {
         @Override
         public ResourceLocation domain() {
             return DOMAIN;
@@ -82,24 +103,70 @@ public final class SpaceTagEdits {
         if (group == null || (tag != null && !tag.group().equals(group.id()))) return "minedraftlib.msg.tag_not_allowed";
         TagPolicy policy = group.policy();
         if (tag == null ? !policy.canErase(area) : !policy.paintable(area, group).contains(tag)) return "minedraftlib.msg.tag_not_allowed";
+        // 개체 묶음: 넣을 개체 번호를 정한다
+        int inst = 0;      // 칠할 칸이 갖게 될 번호
+        int onlyInst = 0;  // 지울 때: 이 개체의 칸만 (0 = 어느 개체든)
+        Stroke stroke = null;
+        if (group.instanced()) {
+            if (tag == null) {
+                onlyInst = Math.max(0, req.instance());
+            } else if (req.instance() == NEW_INSTANCE) {
+                // 같은 끌기(되돌리기 묶음)의 앞선 요청이 만든 개체가 있으면 거기에 넣는다. 번호는 칠할 칸이 있을 때 매긴다
+                Stroke last = STROKES.get(ctx.player.getUUID());
+                if (last != null && req.group() != 0 && last.matches(area, group, req.group(), tag)
+                        && layer.instance(group.id(), last.instance) != null) inst = last.instance;
+                else stroke = new Stroke(area.id, group.id(), req.group(), tag, 0);
+            } else {
+                SpaceTagLayer.Instance in = req.instance() > 0 ? layer.instance(group.id(), req.instance()) : null;
+                // 없는 개체(그새 지워졌다)나 태그가 다른 개체에는 넣지 않는다: 개체 하나는 태그 하나
+                if (in == null || in.tag != tag) return "minedraftlib.msg.tag_instance_gone";
+                inst = in.id;
+            }
+        }
         List<Long> pos = new ArrayList<>();
         for (long p : req.pos()) {
             if (!area.isInside(p)) continue;
             SpaceTag before = layer.tagAt(p, group.id());
-            if (before == tag) continue;
+            int beforeInst = layer.instanceAt(p, group.id());
+            if (tag == null) {
+                if (before == null || (onlyInst != 0 && beforeInst != onlyInst)) continue;
+            } else if (before == tag && (stroke == null && beforeInst == inst)) {
+                continue;
+            }
             if (!policy.allows(area, p, tag)) continue;
             pos.add(p);
-            ctx.undo.add(new TagChange(group.id(), p, before, tag));
         }
         if (pos.isEmpty()) return null;
+        if (stroke != null) {
+            inst = layer.allocateInstance(group.id());
+            STROKES.put(ctx.player.getUUID(), new Stroke(stroke.area, stroke.tagGroup, stroke.undoGroup, tag, inst));
+        }
         long[] arr = new long[pos.size()];
         SpaceTag[] tags = new SpaceTag[arr.length];
+        int[] insts = group.instanced() ? new int[arr.length] : null;
         for (int i = 0; i < arr.length; i++) {
             arr[i] = pos.get(i);
             tags[i] = tag;
+            if (insts != null) insts[i] = tag == null ? 0 : inst;
+            ctx.undo.add(new TagChange(group.id(), arr[i], layer.tagAt(arr[i], group.id()), tag,
+                    layer.instanceAt(arr[i], group.id()), tag == null ? 0 : inst));
         }
-        ctx.ops.add(new Set(group.id(), arr, tags));
+        ctx.ops.add(new Set(group.id(), arr, tags, insts));
         return null;
+    }
+
+    /** 플레이어의 마지막 '새 개체' 끌기: 같은 끌기의 다음 요청을 같은 개체에 넣는다. */
+    private record Stroke(java.util.UUID area, ResourceLocation tagGroup, int undoGroup, SpaceTag tag, int instance) {
+        boolean matches(Area a, TagGroup g, int undo, SpaceTag t) {
+            return area.equals(a.id) && tagGroup.equals(g.id()) && undoGroup == undo && tag == t;
+        }
+    }
+
+    private static final java.util.Map<java.util.UUID, Stroke> STROKES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 플레이어가 나갔다: 끌기 기록을 버린다. */
+    public static void forget(java.util.UUID player) {
+        STROKES.remove(player);
     }
 
     static {
@@ -108,13 +175,19 @@ public final class SpaceTagEdits {
             long[] pos = CellIO.readPositions(buf, MAX_CELLS);
             SpaceTag[] tags = new SpaceTag[pos.length];
             for (int i = 0; i < pos.length; i++) tags[i] = SpaceTag.read(buf);
-            return new Set(g, pos, tags);
+            int[] inst = null;
+            if (buf.readBoolean()) {
+                inst = new int[pos.length];
+                for (int i = 0; i < pos.length; i++) inst[i] = buf.readVarInt();
+            }
+            return new Set(g, pos, tags, inst);
         });
         EditRequests.register(PAINT, buf -> {
             int group = buf.readVarInt();
             long[] pos = CellIO.readPositions(buf, MAX_CELLS);
             ResourceLocation g = buf.readResourceLocation();
-            return new Paint(group, pos, g, SpaceTag.read(buf));
+            SpaceTag tag = SpaceTag.read(buf);
+            return new Paint(group, pos, g, tag, buf.readVarInt());
         }, SpaceTagEdits::paint);
         // 되돌리기: 내가 칠한 뒤 아무도 바꾸지 않은 칸만 되돌린다
         UndoHistory.registerInverter(DOMAIN, (area, changes, out) -> {
@@ -124,17 +197,27 @@ public final class SpaceTagEdits {
             // 묶음별로 모아 연산 하나씩
             java.util.Map<ResourceLocation, List<Long>> pos = new java.util.LinkedHashMap<>();
             java.util.Map<ResourceLocation, List<SpaceTag>> tags = new java.util.LinkedHashMap<>();
+            java.util.Map<ResourceLocation, List<Integer>> insts = new java.util.LinkedHashMap<>();
             for (int i = changes.size() - 1; i >= 0; i--) {
                 if (!(changes.get(i) instanceof TagChange c)) continue;
-                if (layer.tagAt(c.pos(), c.tagGroup()) != c.after()) continue;
+                if (layer.tagAt(c.pos(), c.tagGroup()) != c.after() || layer.instanceAt(c.pos(), c.tagGroup()) != c.afterInst()) continue;
+                // 되돌릴 개체가 그새 다른 태그의 개체가 되었으면 (지워진 뒤 번호는 다시 쓰이지 않으니 드물다) 건너뛴다
+                if (c.before() != null && c.beforeInst() != 0) {
+                    SpaceTagLayer.Instance in = layer.instance(c.tagGroup(), c.beforeInst());
+                    if (in != null && in.tag != c.before()) continue;
+                }
                 pos.computeIfAbsent(c.tagGroup(), k -> new ArrayList<>()).add(c.pos());
                 tags.computeIfAbsent(c.tagGroup(), k -> new ArrayList<>()).add(c.before());
-                inverse.add(0, new TagChange(c.tagGroup(), c.pos(), c.after(), c.before()));
+                insts.computeIfAbsent(c.tagGroup(), k -> new ArrayList<>()).add(c.beforeInst());
+                inverse.add(0, new TagChange(c.tagGroup(), c.pos(), c.after(), c.before(), c.afterInst(), c.beforeInst()));
             }
             for (var e : pos.entrySet()) {
                 long[] arr = new long[e.getValue().size()];
                 for (int i = 0; i < arr.length; i++) arr[i] = e.getValue().get(i);
-                out.add(new Set(e.getKey(), arr, tags.get(e.getKey()).toArray(new SpaceTag[0])));
+                List<Integer> il = insts.get(e.getKey());
+                int[] ia = null;
+                for (int v : il) if (v != 0) { ia = il.stream().mapToInt(Integer::intValue).toArray(); break; }
+                out.add(new Set(e.getKey(), arr, tags.get(e.getKey()).toArray(new SpaceTag[0]), ia));
             }
             return inverse;
         });

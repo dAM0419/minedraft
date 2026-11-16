@@ -127,12 +127,22 @@ public final class AreaManager {
         return sessions.get(player.getUUID());
     }
 
-    /** 편집창을 연다: 영역 사본을 보내고, 월드 스냅샷은 틱마다 나눠 보낸다. */
-    public void openEditor(ServerPlayer player, Area a, BlockPos anchor) {
+    /**
+     * 편집창을 연다: 영역 사본을 보내고, 월드 스냅샷은 틱마다 나눠 보낸다.
+     * 권한({@link dev.minedraft.lib.area.AreaAccess})이 없으면 열지 않고 false. 보기 권한이면 보기 전용으로 연다.
+     */
+    public boolean openEditor(ServerPlayer player, Area a, BlockPos anchor) {
+        dev.minedraft.lib.area.AreaAccess.Level access = dev.minedraft.lib.area.AreaAccess.level(player, a);
+        if (access == dev.minedraft.lib.area.AreaAccess.Level.NONE) {
+            toast(player, "minedraftlib.msg.no_permission");
+            return false;
+        }
+        boolean canEdit = access == dev.minedraft.lib.area.AreaAccess.Level.EDIT;
         Session old = sessions.put(player.getUUID(), new Session(a.id, player.level().dimension(), anchor.immutable()));
         if (old != null && !old.area().equals(a.id)) broadcastEditors(old.area());
         LibNet.CHANNEL.toPlayer(player, LibNet.S_EDITOR_BEGIN, buf -> {
             buf.writeBlockPos(anchor);
+            buf.writeBoolean(canEdit);
             AreaCodec.write(buf, a);
         });
         // 청크 스냅샷은 틱마다 나눠 보낸다 (최대 100청크를 한 틱에 읽으면 서버가 멈춘다). 다 보내면 준비 완료.
@@ -145,6 +155,7 @@ public final class AreaManager {
         q.add(new long[]{1, 0, 1});
         snapshotTarget.put(player.getUUID(), a.id);
         broadcastEditors(a.id);
+        return true;
     }
 
     public void closeEditor(ServerPlayer player, @Nullable String reasonKey) {
@@ -173,6 +184,7 @@ public final class AreaManager {
         if (s != null) broadcastEditors(s.area());
         for (Set<UUID> set : subscribers.values()) set.remove(uuid);
         histories.remove(uuid);
+        dev.minedraft.lib.space.SpaceTagEdits.forget(uuid);
         snapshotQueue.remove(uuid);
         snapshotTarget.remove(uuid);
     }
@@ -306,6 +318,10 @@ public final class AreaManager {
         Area a = area(id);
         if (a == null) {
             reject(player, id, clientSeq, "minedraftlib.msg.area_missing");
+            return;
+        }
+        if (dev.minedraft.lib.area.AreaAccess.level(player, a) != dev.minedraft.lib.area.AreaAccess.Level.EDIT) {
+            reject(player, id, clientSeq, "minedraftlib.msg.no_permission");
             return;
         }
         UndoHistory history = histories.computeIfAbsent(player.getUUID(), k -> new HashMap<>())

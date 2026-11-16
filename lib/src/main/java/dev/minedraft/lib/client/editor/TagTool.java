@@ -27,6 +27,9 @@ import java.util.List;
  * <ul>
  *     <li>좌클릭·끌기: 칠하기 &nbsp; 휠클릭: 커서 칸의 태그 집기 &nbsp; Alt+휠: 붓 크기</li>
  * </ul>
+ * 개체 묶음({@link TagGroup#instanced}): 고른 개체가 있으면 그 개체에 칸을 넣는다. 고른 개체가 없으면 끌기를 시작한 칸이
+ * 같은 태그의 개체일 때 그 개체를 골라 넓히고, 아니면 새 개체를 만든다 (끌기 한 번 = 개체 하나, 만든 개체가 골라진다).
+ * 휠클릭은 개체도 집는다. 모드는 {@link #selectInstance} 로 자기 목록에서 고른 개체를 넘길 수 있다.
  */
 public final class TagTool {
     public static final int MAX_BRUSH = 16;
@@ -41,8 +44,17 @@ public final class TagTool {
     public ResourceLocation eraseGroup;
     public int brush = 1;
 
+    /** 개체 묶음에서 고른 개체 (묶음 ID → 번호). 없으면 새 개체를 만든다. */
+    private final java.util.Map<ResourceLocation, Integer> selectedInstance = new java.util.HashMap<>();
+    /** 방금 만든 개체를 고르려고 기다리는 중: 이 칸에 번호가 붙으면 그 개체를 고른다. */
+    private long awaitPos;
+    @Nullable
+    private ResourceLocation awaitGroup;
+
     private boolean stroking;
     private int group;
+    /** 이번 끌기에서 넣을 개체 (개체 묶음이 아니면 0). */
+    private int strokeInstance;
     private final LongOpenHashSet done = new LongOpenHashSet();
 
     TagTool(AreaEditorScreen screen) {
@@ -104,6 +116,43 @@ public final class TagTool {
         eraseGroup = null;
     }
 
+    /** 이 묶음에서 고른 개체 (없거나 사라졌으면 0). */
+    public int selectedInstance(ResourceLocation group) {
+        resolveAwait();
+        Integer id = selectedInstance.get(group);
+        if (id == null) return 0;
+        SpaceTagLayer l = SpaceTagLayer.of(area());
+        if (l == null || l.instance(group, id) == null) {
+            selectedInstance.remove(group);
+            return 0;
+        }
+        return id;
+    }
+
+    /** 개체를 고른다 (0 = 고르지 않음: 다음 끌기는 새 개체). 그 개체의 태그도 칠할 태그로 고른다. */
+    public void selectInstance(ResourceLocation group, int id) {
+        awaitGroup = null;
+        SpaceTagLayer l = SpaceTagLayer.of(area());
+        SpaceTagLayer.Instance in = l == null || id <= 0 ? null : l.instance(group, id);
+        if (in == null) {
+            selectedInstance.remove(group);
+            return;
+        }
+        selectedInstance.put(group, id);
+        select(in.tag);
+    }
+
+    /** 방금 만든 개체에 번호가 붙었으면 고른다 (서버가 번호를 매겨 돌려준 뒤). */
+    private void resolveAwait() {
+        if (awaitGroup == null) return;
+        SpaceTagLayer l = SpaceTagLayer.of(area());
+        int id = l == null ? 0 : l.instanceAt(awaitPos, awaitGroup);
+        if (id == 0) return;
+        ResourceLocation g = awaitGroup;
+        awaitGroup = null;
+        selectedInstance.put(g, id);
+    }
+
     public void selectErase(TagGroup g) {
         eraseGroup = g.id();
     }
@@ -130,14 +179,21 @@ public final class TagTool {
         TagGroup g = currentGroup();
         if (l == null || g == null) return new long[0];
         SpaceTag t = current();
-        TagPolicy pol = g.policy();
         ResourceLocation gid = g.id();
+        // 개체 묶음: 끄는 중이면 이번 끌기의 개체, 아니면 고른 개체 (없으면 새 개체 = 모든 칸이 바뀐다)
+        int inst = !g.instanced() ? 0 : stroking ? strokeInstance : selectedInstance(gid);
         LongArrayList out = new LongArrayList();
         for (int x = b.minX(); x <= b.maxX(); x++)
             for (int y = b.minY(); y <= b.maxY(); y++)
                 for (int z = b.minZ(); z <= b.maxZ(); z++) {
                     long p = BlockPos.asLong(x, y, z);
-                    if (!a.isInside(p) || l.tagAt(p, gid) == t || !screen.tagAllows(g, p, t)) continue;
+                    if (!a.isInside(p) || !screen.tagAllows(g, p, t)) continue;
+                    SpaceTag before = l.tagAt(p, gid);
+                    if (t == null) {
+                        if (before == null || (inst > 0 && l.instanceAt(p, gid) != inst)) continue;
+                    } else if (before == t && (!g.instanced() || (inst > 0 && l.instanceAt(p, gid) == inst))) {
+                        continue;
+                    }
                     out.add(p);
                 }
         return out.toLongArray();
@@ -161,17 +217,50 @@ public final class TagTool {
                 if (g == null || !paintable(g).contains(t)) continue;
                 if (pick == null || (cg != null && t.group().equals(cg.id()))) pick = t;
             }
-            if (pick != null) select(pick);
+            if (pick != null) {
+                select(pick);
+                TagGroup pg = area().type.tagGroup(pick.group());
+                if (pg != null && pg.instanced()) selectInstance(pg.id(), l.instanceAt(h.pos().asLong(), pg.id()));
+            } else if (cg != null && cg.instanced()) {
+                selectInstance(cg.id(), 0); // 빈 칸을 집으면 고른 개체를 놓는다
+            }
             return;
         }
         if (button != 0) return;
+        if (ClientAreas.readOnly()) {
+            screen.session().toast(Component.translatable("minedraftlib.msg.no_permission"));
+            return;
+        }
         if (h == null) {
             screen.session().toast(Component.translatable("minedraftlib.msg.no_target"));
             return;
         }
-        stroking = true;
         group = ClientAreas.nextGroup();
         done.clear();
+        strokeInstance = 0;
+        awaitGroup = null;
+        TagGroup g = currentGroup();
+        if (g != null && g.instanced()) {
+            SpaceTagLayer l = SpaceTagLayer.of(area());
+            SpaceTag t = current();
+            int sel = selectedInstance(g.id());
+            if (t == null) {
+                strokeInstance = sel; // 지우기: 고른 개체가 있으면 그 개체의 칸만
+            } else {
+                SpaceTagLayer.Instance in = sel == 0 || l == null ? null : l.instance(g.id(), sel);
+                if (in != null && in.tag == t) {
+                    strokeInstance = sel;
+                } else if (l != null && l.tagAt(h.pos().asLong(), g.id()) == t && l.instanceAt(h.pos().asLong(), g.id()) > 0) {
+                    // 같은 태그의 개체 위에서 시작: 그 개체를 골라 넓힌다
+                    strokeInstance = l.instanceAt(h.pos().asLong(), g.id());
+                    selectedInstance.put(g.id(), strokeInstance);
+                } else {
+                    strokeInstance = SpaceTagEdits.NEW_INSTANCE;
+                    selectedInstance.remove(g.id());
+                }
+            }
+        }
+        stroking = true;
         paintAt(h);
     }
 
@@ -203,7 +292,11 @@ public final class TagTool {
         long[] cells = send.toLongArray();
         // 모드가 직접 처리하는 태그 (DaB 구조물: 칸을 구조물에 넣는다)
         if (screen.paintTags(g, current(), cells, group)) return;
-        screen.session().send(new SpaceTagEdits.Paint(group, cells, g.id(), current()));
+        if (strokeInstance == SpaceTagEdits.NEW_INSTANCE && awaitGroup == null) {
+            awaitGroup = g.id();   // 서버가 번호를 매겨 돌려주면 그 개체를 고른다
+            awaitPos = cells[0];
+        }
+        screen.session().send(new SpaceTagEdits.Paint(group, cells, g.id(), current(), strokeInstance));
     }
 
     // ------------------------------------------------------------------
@@ -231,6 +324,8 @@ public final class TagTool {
                 for (SpaceTag x : here) {
                     if (b.length() > 0) b.append(", ");
                     b.append(Component.translatable(x.nameKey()).getString());
+                    int in = l.instanceAt(h.pos().asLong(), x.group());
+                    if (in > 0) b.append(' ').append(screen.tagInstanceName(x.group(), in));
                 }
                 lines.add(Component.translatable("minedraftlib.editor.tag_here", b.toString()));
             }

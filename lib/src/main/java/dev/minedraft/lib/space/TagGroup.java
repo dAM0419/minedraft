@@ -12,8 +12,11 @@ import java.util.List;
  * @param id     묶음 ID. 이름 문구 키는 {@code <namespace>.tag_group.<path>}
  * @param tags   이 묶음의 태그 (모두 group = id)
  * @param policy 칠할 수 있는 태그·칸
+ * @param instanced 개체 묶음인가. 개체 묶음의 칸은 태그와 함께 개체 번호(1 이상)를 갖는다: 같은 태그라도 번호가 다르면
+ *                  다른 개체다 (Civilize 의 밭 1·밭 2). 개체 하나의 칸은 모두 같은 태그다. 번호는 서버가 매긴다
+ *                  ({@link SpaceTagLayer}).
  */
-public record TagGroup(ResourceLocation id, List<SpaceTag> tags, TagPolicy policy) {
+public record TagGroup(ResourceLocation id, List<SpaceTag> tags, TagPolicy policy, boolean instanced) {
     public TagGroup {
         tags = List.copyOf(tags);
         for (SpaceTag t : tags) {
@@ -21,8 +24,12 @@ public record TagGroup(ResourceLocation id, List<SpaceTag> tags, TagPolicy polic
         }
     }
 
+    public TagGroup(ResourceLocation id, List<SpaceTag> tags, TagPolicy policy) {
+        this(id, tags, policy, false);
+    }
+
     public TagGroup(ResourceLocation id, List<SpaceTag> tags) {
-        this(id, tags, TagPolicy.DEFAULT);
+        this(id, tags, TagPolicy.DEFAULT, false);
     }
 
     public String nameKey() {

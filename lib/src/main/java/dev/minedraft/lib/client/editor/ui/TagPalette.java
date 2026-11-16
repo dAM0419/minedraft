@@ -51,9 +51,15 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
         return rows;
     }
 
-    /** 줄 수 (태그 표시·붓 줄 포함). */
+    /** 지금 묶음이 개체 묶음이면 '고른 개체' 줄이 하나 더 있다. */
+    private boolean instanceRow() {
+        TagGroup g = tool().currentGroup();
+        return g != null && g.instanced();
+    }
+
+    /** 줄 수 (개체·태그 표시·붓 줄 포함). */
     public int rows() {
-        return rowList().size() + 2;
+        return rowList().size() + 2 + (instanceRow() ? 1 : 0);
     }
 
     @Override
@@ -79,6 +85,17 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
                 SpaceTag tag = r.tag();
                 row(g, mx, my, ry, tag.icon(), 0xFF000000 | tag.color(), Component.translatable(tag.nameKey()), cur == tag);
             }
+            ry += ROW;
+        }
+        // 개체 묶음: 고른 개체 (눌러서 놓으면 다음 끌기는 새 개체)
+        if (instanceRow()) {
+            int sel = t.selectedInstance(curGroup.id());
+            boolean hv = sel > 0 && Ui.inside(mx, my, x + 1, ry, w - 2, ROW);
+            if (hv) g.fill(x + 1, ry, x + w - 1, ry + ROW, Ui.HOVER);
+            Component label = sel > 0
+                    ? Component.translatable("minedraftlib.tag.instance", screen.tagInstanceName(curGroup.id(), sel))
+                    : Component.translatable("minedraftlib.tag.instance_new");
+            Ui.text(g, Ui.clip(label.getString(), w - 10), x + 5, ry + 3, sel > 0 ? Ui.TEXT : Ui.DIM);
             ry += ROW;
         }
         // 태그 표시 (T): 칸마다 태그 색으로 덮어 바닥·길·구조물 등을 구분해 본다
@@ -109,8 +126,14 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
             Row r = list.get(i);
             if (r.erase()) tool().selectErase(r.group());
             else if (r.tag() != null) tool().select(r.tag());
-        } else if (i == list.size()) {
-            screen.tagView = !screen.tagView;
+        } else {
+            int k = i - list.size();
+            if (instanceRow()) {
+                TagGroup cg = tool().currentGroup();
+                if (k == 0 && cg != null) tool().selectInstance(cg.id(), 0);
+                k--;
+            }
+            if (k == 0) screen.tagView = !screen.tagView;
         }
         return true;
     }

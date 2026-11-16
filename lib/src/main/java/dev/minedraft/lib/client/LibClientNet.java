@@ -25,9 +25,10 @@ public final class LibClientNet {
         switch (frame.kind()) {
             case LibNet.S_EDITOR_BEGIN -> {
                 BlockPos anchor = buf.readBlockPos();
+                boolean canEdit = buf.readBoolean();
                 Area a = AreaCodec.read(buf);
                 ClientAreas.put(a);
-                ClientAreas.open(a, anchor);
+                ClientAreas.open(a, anchor, canEdit);
             }
             case LibNet.S_SNAPSHOT -> {
                 UUID id = buf.readUUID();
