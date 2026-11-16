@@ -21,7 +21,7 @@
   "designandbuild.editor.replaces_floor": "Replaces %s floor/path cells",
   "designandbuild.editor.rotation_locked": "Rotation locked (side mount)",
   "designandbuild.editor.skipped_foreign": "%s cells of another structure skipped · Alt+click to select it",
-  "designandbuild.editor.tag_tool_hint": "Assign space: Floor/Path retag designed terrain blocks · Structure puts existing blocks into the selected structure (or a new one); drag the range handles to grow it",
+  "designandbuild.editor.tag_tool_hint": "Assign space: Floor/Path tag existing blocks (world or designed terrain); set the range in the X·Y·Z cells under the tag list · Structure puts existing blocks into the selected structure (or a new one); drag the range handles to grow it",
   "designandbuild.editor.title": "DaB Editor",
   "designandbuild.erase.air": "Erase → air of the selected structure",
   "designandbuild.erase.demolish": "Erase → demolish",
@@ -88,6 +88,7 @@
   "designandbuild.help.apply": "Apply · place · select",
   "designandbuild.help.cancel_place": "Drop the placement ghost",
   "designandbuild.help.direct": "Editing",
+  "designandbuild.help.drag_vertical": "Move up / down only",
   "designandbuild.help.eyedropper": "Eyedropper (block with state)",
   "designandbuild.help.eyedropper_palette": "Eyedropper into the palette",
   "designandbuild.help.mirror": "Mirror",
@@ -134,6 +135,7 @@
   "designandbuild.hidden.tag_done": "Tag '%s' hidden · undo in Hidden items",
   "designandbuild.hidden.title": "Hidden items",
   "designandbuild.hidden.unhide": "Unhide",
+  "designandbuild.hud.work_pointer": "Work %s · %s blocks",
   "designandbuild.instant.apply": "Apply",
   "designandbuild.instant.busy": "Already applying this blueprint",
   "designandbuild.instant.button": "Apply this stage instantly",
@@ -458,7 +460,5 @@
   "key.designandbuild.layer_up": "Projection: layer up",
   "key.designandbuild.materials": "Projection: materials list",
   "key.designandbuild.stage_next": "Projection: next stage",
-  "key.designandbuild.stage_prev": "Projection: previous stage",
-  "designandbuild.help.drag_vertical": "Move up / down only",
-  "designandbuild.hud.work_pointer": "Work %s · %s blocks"
+  "key.designandbuild.stage_prev": "Projection: previous stage"
 }

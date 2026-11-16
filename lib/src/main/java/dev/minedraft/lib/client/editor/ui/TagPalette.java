@@ -57,9 +57,20 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
         return g != null && g.instanced();
     }
 
-    /** 줄 수 (개체·태그 표시·붓 줄 포함). */
+    /** 줄 수 (개체·태그 표시·범위 제목·범위 값 줄 포함). */
     public int rows() {
-        return rowList().size() + 2 + (instanceRow() ? 1 : 0);
+        return rowList().size() + 3 + (instanceRow() ? 1 : 0);
+    }
+
+    /** 범위 값 줄의 위치 (맨 아래 줄). 축 칸 셋으로 나눈다. */
+    private int rangeRowY() {
+        return y + 1 + (rows() - 1) * ROW;
+    }
+
+    private int rangeAxisAt(double mx, double my) {
+        int ry = rangeRowY();
+        if (my < ry || my >= ry + ROW || mx < x + 2 || mx >= x + w - 2) return -1;
+        return Math.min(2, (int) ((mx - x - 2) * 3 / (w - 4)));
     }
 
     @Override
@@ -106,7 +117,18 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
         Ui.text(g, Component.translatable(on ? "minedraftlib.tag.view_on" : "minedraftlib.tag.view_off"), x + 24, ry + 3,
                 on ? Ui.TEXT : Ui.DIM);
         ry += ROW;
-        Ui.text(g, Component.translatable("minedraftlib.editor.tag_brush", t.brush), x + 5, ry + 3, Ui.DIM);
+        // 칠하기 범위: 축마다 칸 수 (칸 위에서 휠·좌클릭 +1, 우클릭 −1. Alt+휠은 셋을 함께)
+        Ui.text(g, Component.translatable("minedraftlib.editor.tag_range"), x + 5, ry + 3, Ui.DIM);
+        ry += ROW;
+        int cw = (w - 4) / 3;
+        int over = rangeAxisAt(mx, my);
+        String[] axis = {"X", "Y", "Z"};
+        int[] val = {t.brushX, t.brushY, t.brushZ};
+        for (int i = 0; i < 3; i++) {
+            int cx = x + 2 + i * cw;
+            g.fill(cx + 1, ry + 1, cx + cw - 1, ry + ROW - 1, over == i ? Ui.HOVER : 0x40FFFFFF);
+            Ui.text(g, Component.literal(axis[i] + " " + val[i]), cx + 5, ry + 3, Ui.TEXT);
+        }
     }
 
     private void row(GuiGraphics g, int mx, int my, int ry, int icon, int color, Component name, boolean active) {
@@ -120,6 +142,11 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
+        int axis = rangeAxisAt(mx, my);
+        if (axis >= 0) {
+            tool().brushAdd(axis, button == 1 ? -1 : 1);
+            return true;
+        }
         int i = (int) ((my - y - 1) / ROW);
         List<Row> list = rowList();
         if (i >= 0 && i < list.size()) {
@@ -140,7 +167,9 @@ public final class TagPalette extends UiPart<AreaEditorScreen> {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double delta) {
-        tool().brushScroll(delta);
+        int axis = rangeAxisAt(mx, my);
+        if (axis >= 0) tool().brushAdd(axis, delta > 0 ? 1 : -1);
+        else tool().brushScroll(delta);
         return true;
     }
 }

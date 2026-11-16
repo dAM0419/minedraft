@@ -32,7 +32,7 @@ import java.util.List;
  * 휠클릭은 개체도 집는다. 모드는 {@link #selectInstance} 로 자기 목록에서 고른 개체를 넘길 수 있다.
  */
 public final class TagTool {
-    public static final int MAX_BRUSH = 16;
+    public static final int MAX_BRUSH = 32;
 
     private final AreaEditorScreen screen;
     /** 켜져 있으면 모드 도구 대신 이 도구가 뷰포트 입력을 받는다. */
@@ -42,7 +42,8 @@ public final class TagTool {
     public SpaceTag tag;
     @Nullable
     public ResourceLocation eraseGroup;
-    public int brush = 1;
+    /** 붓 범위: 가로(X)·높이(Y)·세로(Z) 칸 수. 태그 목록의 범위 줄에서 축마다 바꾼다 (Alt+휠은 셋을 함께). */
+    public int brushX = 1, brushY = 1, brushZ = 1;
 
     /** 개체 묶음에서 고른 개체 (묶음 ID → 번호). 없으면 새 개체를 만든다. */
     private final java.util.Map<ResourceLocation, Integer> selectedInstance = new java.util.HashMap<>();
@@ -168,8 +169,9 @@ public final class TagTool {
 
     /** 붓이 덮는 상자: 가로·세로는 커서 칸 가운데, 높이는 커서 칸에서 아래로. */
     public Box brushBox(BlockPos p) {
-        int n = brush, lo = (n - 1) / 2;
-        return new Box(p.getX() - lo, p.getY() - (n - 1), p.getZ() - lo, p.getX() - lo + n - 1, p.getY(), p.getZ() - lo + n - 1);
+        int lx = (brushX - 1) / 2, lz = (brushZ - 1) / 2;
+        return new Box(p.getX() - lx, p.getY() - (brushY - 1), p.getZ() - lz,
+                p.getX() - lx + brushX - 1, p.getY(), p.getZ() - lz + brushZ - 1);
     }
 
     /** 붓 안에서 실제로 바뀌는 칸 (영역 안, 정책이 허락, 이미 같은 태그가 아님). */
@@ -278,8 +280,17 @@ public final class TagTool {
         return stroking;
     }
 
+    /** 세 축을 함께 (Alt+휠). */
     public void brushScroll(double delta) {
-        brush = Mth.clamp(brush + (delta > 0 ? 1 : -1), 1, MAX_BRUSH);
+        int d = delta > 0 ? 1 : -1;
+        for (int axis = 0; axis < 3; axis++) brushAdd(axis, d);
+    }
+
+    /** 한 축만 (0 = X, 1 = Y, 2 = Z). */
+    public void brushAdd(int axis, int d) {
+        if (axis == 0) brushX = Mth.clamp(brushX + d, 1, MAX_BRUSH);
+        else if (axis == 1) brushY = Mth.clamp(brushY + d, 1, MAX_BRUSH);
+        else brushZ = Mth.clamp(brushZ + d, 1, MAX_BRUSH);
     }
 
     private void paintAt(AreaEditorSession.Hit h) {
@@ -314,7 +325,7 @@ public final class TagTool {
         SpaceTag t = current();
         String name = t == null ? Component.translatable("minedraftlib.tag.erase").getString() : Component.translatable(t.nameKey()).getString();
         int n = targets(brushBox(h.pos())).length;
-        lines.add(Component.literal(name + " · " + brush + "×" + brush + "×" + brush + " · ")
+        lines.add(Component.literal(name + " · " + brushX + "×" + brushY + "×" + brushZ + " · ")
                 .append(Component.translatable("minedraftlib.editor.tag_cells", n)));
         SpaceTagLayer l = SpaceTagLayer.of(area());
         if (l != null) {

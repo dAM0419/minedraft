@@ -20,6 +20,7 @@ import dev.designandbuild.client.library.LibraryEntry;
 import dev.designandbuild.client.ui.Thumbnails;
 import dev.minedraft.lib.client.ui.Ui;
 import dev.minedraft.lib.util.Box;
+import dev.designandbuild.core.DesignTag;
 import dev.designandbuild.core.Requests;
 import dev.designandbuild.core.StructureInstance;
 import dev.designandbuild.core.TemplateData;
@@ -180,6 +181,10 @@ public final class EditorScreen extends AreaEditorScreen {
 
     @Override
     protected boolean tagAllows(dev.minedraft.lib.space.TagGroup group, long pos, @Nullable dev.minedraft.lib.space.SpaceTag tag) {
+        if (tag == dev.designandbuild.core.DabTags.FLOOR || tag == dev.designandbuild.core.DabTags.PATH) {
+            // 설계한 지형 블록은 태그를 바꾸고, 설계가 없는 칸의 월드 블록은 그대로 지형 층에 넣으며 태그를 붙인다
+            return super.tagAllows(group, pos, tag) || isBareWorldBlock(pos);
+        }
         if (tag != dev.designandbuild.core.DabTags.STRUCTURE) return super.tagAllows(group, pos, tag);
         int x = BlockPos.getX(pos), y = BlockPos.getY(pos), z = BlockPos.getZ(pos);
         BlockState st = s.blockAt(x, y, z, false);
@@ -187,6 +192,12 @@ public final class EditorScreen extends AreaEditorScreen {
         // 이미 넣을 구조물의 칸이면 건너뛴다. 다른 구조물 칸은 겹쳐 넣는다 (그 구조물에서 빠지지 않는다)
         StructureInstance sel = s.selected != 0 ? s.model.structure(s.selected) : null;
         return sel == null || sel.get(pos) == null;
+    }
+
+    /** 설계가 없는 칸(지형 층도 구조물도 아님)의 월드 블록인가. */
+    private boolean isBareWorldBlock(long pos) {
+        if (s.model.terrainAt(pos) != null || s.model.resolved(pos) != null) return false;
+        return !s.worldAt(BlockPos.getX(pos), BlockPos.getY(pos), BlockPos.getZ(pos)).isAir();
     }
 
     // ---- 구조물 범위 손잡이: 손잡이 UI 는 Lib, 어떤 범위·어떻게 넣고 빼는지는 DaB ----
@@ -255,6 +266,25 @@ public final class EditorScreen extends AreaEditorScreen {
     @Override
     protected boolean paintTags(dev.minedraft.lib.space.TagGroup group, @Nullable dev.minedraft.lib.space.SpaceTag tag, long[] pos,
                                 int undoGroup) {
+        if (tag == dev.designandbuild.core.DabTags.FLOOR || tag == dev.designandbuild.core.DabTags.PATH) {
+            // 월드 블록은 지형 층에 그대로 넣으며 태그를 붙이고 (지형 쓰기), 설계한 지형 블록은 태그만 바꾼다 (Lib 칠하기)
+            it.unimi.dsi.fastutil.longs.LongArrayList world = new it.unimi.dsi.fastutil.longs.LongArrayList();
+            it.unimi.dsi.fastutil.longs.LongArrayList designed = new it.unimi.dsi.fastutil.longs.LongArrayList();
+            for (long p : pos) (isBareWorldBlock(p) ? world : designed).add(p);
+            if (world.isEmpty()) return false;
+            DesignTag dt = tag == dev.designandbuild.core.DabTags.FLOOR ? DesignTag.FLOOR : DesignTag.PATH;
+            BlockState[] states = new BlockState[world.size()];
+            DesignTag[] tags = new DesignTag[states.length];
+            for (int i = 0; i < states.length; i++) {
+                long p = world.getLong(i);
+                states[i] = s.worldAt(BlockPos.getX(p), BlockPos.getY(p), BlockPos.getZ(p));
+                tags[i] = dt;
+            }
+            s.send(new Requests.Terrain(undoGroup, world.toLongArray(), states, tags));
+            if (!designed.isEmpty())
+                s.send(new dev.minedraft.lib.space.SpaceTagEdits.Paint(undoGroup, designed.toLongArray(), group.id(), tag));
+            return true;
+        }
         if (tag != dev.designandbuild.core.DabTags.STRUCTURE) return false;
         BlockState[] states = new BlockState[pos.length];
         for (int i = 0; i < pos.length; i++) states[i] = s.blockAt(BlockPos.getX(pos[i]), BlockPos.getY(pos[i]), BlockPos.getZ(pos[i]), false);

@@ -21,7 +21,7 @@
   "designandbuild.editor.replaces_floor": "바닥·길 %s칸 대체",
   "designandbuild.editor.rotation_locked": "회전 고정 (옆면 설치)",
   "designandbuild.editor.skipped_foreign": "다른 구조물 %s칸 제외 · Alt+클릭으로 선택",
-  "designandbuild.editor.tag_tool_hint": "공간 지정: 바닥·길은 설계한 지형 블록의 태그를 바꿉니다 · 구조물은 이미 있는 블록을 선택한 구조물(없으면 새 구조물)에 넣고, 범위 손잡이를 끌어 넓힐 수 있습니다",
+  "designandbuild.editor.tag_tool_hint": "공간 지정: 바닥·길은 이미 있는 블록(월드·설계한 지형)에 태그를 붙입니다. 범위는 태그 목록 아래 X·Y·Z 칸에서 정합니다 · 구조물은 이미 있는 블록을 선택한 구조물(없으면 새 구조물)에 넣고, 범위 손잡이를 끌어 넓힐 수 있습니다",
   "designandbuild.editor.title": "DaB 편집창",
   "designandbuild.erase.air": "지우기 → 선택한 구조물의 공기 지정",
   "designandbuild.erase.demolish": "지우기 → 철거 대상",
@@ -88,6 +88,7 @@
   "designandbuild.help.apply": "적용 · 배치 · 선택",
   "designandbuild.help.cancel_place": "배치 고스트 해제",
   "designandbuild.help.direct": "편집",
+  "designandbuild.help.drag_vertical": "위·아래로만 이동",
   "designandbuild.help.eyedropper": "스포이드 (상태째 집기)",
   "designandbuild.help.eyedropper_palette": "집은 블록을 팔레트에",
   "designandbuild.help.mirror": "좌우 반전",
@@ -134,6 +135,7 @@
   "designandbuild.hidden.tag_done": "'%s' 태그 숨김 · 숨김 관리에서 해제",
   "designandbuild.hidden.title": "숨김 관리",
   "designandbuild.hidden.unhide": "해제",
+  "designandbuild.hud.work_pointer": "할 일 %s · %s칸",
   "designandbuild.instant.apply": "반영",
   "designandbuild.instant.busy": "이 도면은 이미 반영 중입니다",
   "designandbuild.instant.button": "이 단계 즉시 반영",
@@ -458,7 +460,5 @@
   "key.designandbuild.layer_up": "투영: 위층으로",
   "key.designandbuild.materials": "투영: 재료 목록 펼치기",
   "key.designandbuild.stage_next": "투영: 다음 단계",
-  "key.designandbuild.stage_prev": "투영: 이전 단계",
-  "designandbuild.help.drag_vertical": "위·아래로만 이동",
-  "designandbuild.hud.work_pointer": "할 일 %s · %s칸"
+  "key.designandbuild.stage_prev": "투영: 이전 단계"
 }
