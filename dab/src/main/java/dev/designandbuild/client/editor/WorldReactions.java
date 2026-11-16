@@ -124,7 +124,7 @@ final class WorldReactions {
                     if (st == null || st.isAir()) continue;
                     BlockState alt = placeInContext(lv, sim, p, st);
                     if (alt != null && alt.getBlock() != st.getBlock() && StateRules.derivedEquivalent(alt, st)) {
-                        cells.put(p, copyShared(st, alt));
+                        cells.put(p, DerivedStates.copyShared(st, alt));
                     }
                 }
             }
@@ -200,7 +200,7 @@ final class WorldReactions {
                 if (!cells.containsKey(q) && !sameLayer(s, q, structureLayer)) continue;
                 BlockState alt = placeInContext(lv, sim, q, cur);
                 if (alt != null && alt.getBlock() != cur.getBlock() && StateRules.derivedEquivalent(alt, cur)) {
-                    cells.put(q, copyShared(cur, alt));
+                    cells.put(q, DerivedStates.copyShared(cur, alt));
                 }
             }
         } catch (Throwable ignored) {
@@ -275,7 +275,7 @@ final class WorldReactions {
         sim.writes.put(p, Blocks.AIR.defaultBlockState());
         try {
             // 놓을 때 고른 방향에 맞춘 가상 시선 (플레이어 없이 시선을 묻는 블록이 있다: Create 축 등)
-            Direction look = lookOf(st);
+            Direction look = DerivedStates.lookOf(st);
             Direction horizontal = look.getAxis().isHorizontal() ? look : Direction.NORTH;
             BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), look.getOpposite(), pos.relative(look), false);
             BlockPlaceContext ctx = new PlacementStates.VirtualPlaceContext(lv, new ItemStack(bi), hit, pos, look, horizontal);
@@ -288,29 +288,4 @@ final class WorldReactions {
         }
     }
 
-    /** 상태가 가리키는 방향 (축·방향 속성). 없으면 아래. */
-    private static Direction lookOf(BlockState st) {
-        for (Property<?> p : st.getProperties()) {
-            Object v = st.getValue(p);
-            if (v instanceof Direction d) return d;
-            if (v instanceof Direction.Axis a) return Direction.fromAxisAndDirection(a, Direction.AxisDirection.POSITIVE);
-        }
-        return Direction.DOWN;
-    }
-
-    /** alt 에, st 와 이름이 같은 속성의 값(축·방향 등)을 옮긴다. 놓을 때 고른 방향을 지킨다. */
-    private static BlockState copyShared(BlockState st, BlockState alt) {
-        BlockState out = alt;
-        for (Property<?> ap : alt.getProperties()) {
-            for (Property<?> sp : st.getProperties()) {
-                if (!sp.getName().equals(ap.getName())) continue;
-                out = setByName(out, ap, String.valueOf(st.getValue(sp)));
-            }
-        }
-        return out;
-    }
-
-    private static <T extends Comparable<T>> BlockState setByName(BlockState s, Property<T> p, String value) {
-        return p.getValue(value).map(v -> s.setValue(p, v)).orElse(s);
-    }
 }

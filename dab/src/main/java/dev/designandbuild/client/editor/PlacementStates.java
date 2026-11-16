@@ -322,12 +322,12 @@ public final class PlacementStates {
     // ------------------------------------------------------------------
 
     /** 하늘 위 가상 설치 상황. 플레이어 없이, 삼면도에서 고른 시선을 쓴다. */
-    static final class VirtualPlaceContext extends BlockPlaceContext {
+    public static final class VirtualPlaceContext extends BlockPlaceContext {
         private final BlockPos target;
         private final Direction look;
         private final Direction horizontal;
 
-        VirtualPlaceContext(Level level, ItemStack stack, BlockHitResult hit, BlockPos target, Direction look, Direction horizontal) {
+        public VirtualPlaceContext(Level level, ItemStack stack, BlockHitResult hit, BlockPos target, Direction look, Direction horizontal) {
             super(level, null, InteractionHand.MAIN_HAND, stack, hit);
             this.target = target;
             this.look = look;

@@ -122,9 +122,78 @@ public final class ProjectionRenderer {
     private static final int MAX_GHOST_BLOCK_ENTITIES = 2000;
     private static final dev.minedraft.lib.client.render.GhostBlockEntities GHOST_BE = new dev.minedraft.lib.client.render.GhostBlockEntities((x, y, z) -> {
         Projection p = owner;
-        BlockState st = p == null ? null : p.ghostAt(BlockPos.asLong(x, y, z));
+        BlockState st = p == null ? null : displayAt(p, BlockPos.asLong(x, y, z));
         return st == null ? net.minecraft.world.level.block.Blocks.AIR.defaultBlockState() : st;
     });
+
+    // ------------------------------------------------------------------
+    // 파생 블록 표시: 유령 블록을 실제 자리 조건으로 다시 골라 그린다 (설계는 그대로, 보이는 것만)
+    // 예: 증기기관 앞 축 → 동력 축 (그래야 증기기관이 크랭크를 그린다). 예전에 그린 설계에도 적용된다.
+    // ------------------------------------------------------------------
+
+    private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<BlockState> DISPLAY = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+    private static long ctxSkip = Long.MIN_VALUE;
+    @Nullable
+    private static dev.minedraft.lib.client.render.FakeLevel ctxLevel;
+    @Nullable
+    private static net.minecraft.client.multiplayer.ClientLevel ctxFor;
+
+    /** 보일 유령 블록: 파생 블록으로 고른 것이 있으면 그것, 아니면 설계 그대로. */
+    @Nullable
+    static BlockState displayAt(Projection p, long pos) {
+        BlockState d = DISPLAY.get(pos);
+        return d != null ? d : p.ghostAt(pos);
+    }
+
+    /** 유령 + 실제 월드를 보는 가짜 월드 (설치 상태를 다시 물을 때). */
+    @Nullable
+    private static dev.minedraft.lib.client.render.FakeLevel contextLevel() {
+        net.minecraft.client.multiplayer.ClientLevel real = Minecraft.getInstance().level;
+        if (real == null) return null;
+        if (ctxLevel == null || ctxFor != real) {
+            ctxFor = real;
+            try {
+                ctxLevel = new dev.minedraft.lib.client.render.FakeLevel(new dev.minedraft.lib.client.render.FakeLevel.Source() {
+                    @Override
+                    public BlockState blockAt(int x, int y, int z) {
+                        long k = BlockPos.asLong(x, y, z);
+                        if (k == ctxSkip) return net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+                        Projection p = owner;
+                        BlockState g = p == null ? null : displayAt(p, k);
+                        return g != null && !g.isAir() ? g : real.getBlockState(new BlockPos(x, y, z));
+                    }
+
+                    @Override
+                    public net.minecraft.world.level.block.entity.BlockEntity blockEntity(BlockPos pos) {
+                        return null;
+                    }
+                }, real, real.getMinBuildHeight(), real.getHeight());
+            } catch (Throwable t) {
+                ctxLevel = null;
+            }
+        }
+        return ctxLevel;
+    }
+
+    /** 이 구역 유령 칸의 파생 블록 표시를 다시 고른다. */
+    private static void chooseDerived(Projection p, List<BlockPos> ghosts) {
+        net.minecraft.client.multiplayer.ClientLevel real = Minecraft.getInstance().level;
+        dev.minedraft.lib.client.render.FakeLevel lv = real == null ? null : contextLevel();
+        for (BlockPos gp : ghosts) {
+            long k = gp.asLong();
+            DISPLAY.remove(k);
+            if (lv == null) continue;
+            BlockState st = p.ghostAt(k);
+            if (st == null || st.isAir() || !dev.designandbuild.client.editor.DerivedStates.hasVariants(st.getBlock(), real)) continue;
+            ctxSkip = k;
+            try {
+                BlockState alt = dev.designandbuild.client.editor.DerivedStates.inContext(lv, gp, st);
+                if (alt != null) DISPLAY.put(k, alt);
+            } finally {
+                ctxSkip = Long.MIN_VALUE;
+            }
+        }
+    }
 
     static final Matrix4f LAST_VIEW = new Matrix4f(), LAST_PROJ = new Matrix4f();
     @Nullable
@@ -150,6 +219,7 @@ public final class ProjectionRenderer {
         QUEUED.clear();
         owner = null;
         GHOST_BE.clear();
+        DISPLAY.clear();
         // 화면 크기 합성 버퍼는 투영을 다시 그릴 때 만든다 (들고 있지 않을 때 그래픽 메모리를 쥐고 있지 않게)
         if (ghostTarget != null) {
             ghostTarget.destroyBuffers();
@@ -206,6 +276,7 @@ public final class ProjectionRenderer {
         it.unimi.dsi.fastutil.ints.IntArrayList cells = p.cellsIn(sec);
         if (cells == null) return 1;
         int ox = SectionPos.x(sec) << 4, oy = SectionPos.y(sec) << 4, oz = SectionPos.z(sec) << 4;
+        for (int k = 0; k < cells.size(); k++) DISPLAY.remove(p.pos[cells.getInt(k)]); // 지어진 칸의 지난 표시 선택을 비운다
         List<BlockPos> ghostList = new ArrayList<>();
         BufferBuilder lines = null, quads = null;
         int work = 0;
@@ -245,10 +316,11 @@ public final class ProjectionRenderer {
             if (mesher == null) mesher = new BlockMesher();
             // 불투명하게 굽는다 (반투명은 합성 단계에서 한 번에).
             // 이웃 구역의 유령도 보이게 투영 전체를 조회한다: 구역 경계에서 맞닿은 면이 지워지고 그늘이 이어진다
-            v.ghost = mesher.build(new MapWorld(p::ghostAt, oy - 16, 48, true), ghostList.iterator(), ox, oy, oz, 1.0F, false);
+            chooseDerived(p, ghostList);
+            v.ghost = mesher.build(new MapWorld(q -> displayAt(p, q), oy - 16, 48, true), ghostList.iterator(), ox, oy, oz, 1.0F, false);
             it.unimi.dsi.fastutil.longs.LongArrayList ents = new it.unimi.dsi.fastutil.longs.LongArrayList();
             for (BlockPos gp : ghostList) {
-                BlockState st = p.ghostAt(gp.asLong());
+                BlockState st = displayAt(p, gp.asLong());
                 if (st != null && st.hasBlockEntity()) ents.add(gp.asLong());
             }
             v.entities = ents.toLongArray();
