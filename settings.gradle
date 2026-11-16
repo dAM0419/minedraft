@@ -13,3 +13,4 @@ rootProject.name = 'minedraft'
 // Minedraft Lib (공용 편집창·영역·동기화)과 그 위의 모드들
 include 'lib'
 include 'dab'
+include 'cag'

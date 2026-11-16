@@ -168,7 +168,9 @@ public final class Area {
         }
         it = add.iterator();
         while (it.hasNext()) next.add(it.nextLong());
-        if (next.size() > type.maxChunks()) return "minedraftlib.msg.chunk_limit";
+        if (next.size() > AreaRules.maxChunks(this)) return "minedraftlib.msg.chunk_limit";
+        String veto = AreaRules.check(this, add, remove);
+        if (veto != null) return veto;
         LongOpenHashSet seen = new LongOpenHashSet();
         LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
         queue.enqueue(baseChunk());

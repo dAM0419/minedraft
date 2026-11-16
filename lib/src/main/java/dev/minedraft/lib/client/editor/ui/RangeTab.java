@@ -132,8 +132,8 @@ public final class RangeTab implements PanelTab {
         refreshModified(m);
         pruneSelection(m);
         updateAngle();
-        Component count = Component.translatable("minedraftlib.range.count", m.chunks().size(), m.type.maxChunks());
-        Ui.text(g, count, x + 6, y + 5, m.chunks().size() >= m.type.maxChunks() ? Ui.WARN : Ui.TEXT);
+        Component count = Component.translatable("minedraftlib.range.count", m.chunks().size(), dev.minedraft.lib.area.AreaRules.maxChunks(m));
+        Ui.text(g, count, x + 6, y + 5, m.chunks().size() >= dev.minedraft.lib.area.AreaRules.maxChunks(m) ? Ui.WARN : Ui.TEXT);
 
         mapX = x + 4;
         mapY = y + 18;
