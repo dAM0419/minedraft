@@ -68,7 +68,7 @@ public final class ServerEvents {
         }
     }
 
-    /** 광장 블록은 시장만, 주민이 0명일 때만 부술 수 있다. 부수면 도시가 없어진다. */
+    /** 광장 블록은 시장이 해체를 허용해 두고, 주민이 0명일 때만 부술 수 있다. 부수면 도시가 없어진다. */
     private static void onBreak(BlockEvent.BreakEvent event) {
         if (!event.getState().is(Registration.PLAZA.get())) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
@@ -77,10 +77,12 @@ public final class ServerEvents {
         City c = m.byId(plaza.cityId());
         if (c == null) return;
         boolean mayor = event.getPlayer().getUUID().equals(c.founder);
-        if (!mayor || c.population > 0) {
+        // D-55: 도시가 있는 광장 블록은 시장도 그냥은 못 부순다. 도시 패널에서 "도시 해체 허용"을 켠 뒤에만 된다.
+        if (!mayor || c.population > 0 || !c.allowDissolve) {
             event.setCanceled(true);
             if (event.getPlayer() instanceof ServerPlayer sp) {
-                ServerNet.toast(sp, mayor ? "civilizeandgovern.msg.plaza_has_citizens" : "civilizeandgovern.msg.plaza_not_mayor");
+                ServerNet.toast(sp, !mayor ? "civilizeandgovern.msg.plaza_not_mayor"
+                        : c.population > 0 ? "civilizeandgovern.msg.plaza_has_citizens" : "civilizeandgovern.msg.plaza_locked");
             }
             return;
         }

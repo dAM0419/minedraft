@@ -63,6 +63,20 @@ public final class Registration {
     public static final DeferredItem<Item> COIN_10 = ITEMS.register("coin_10", () -> new Item(new Item.Properties()));
     public static final DeferredItem<Item> COIN_100 = ITEMS.register("coin_100", () -> new Item(new Item.Properties()));
 
+    /** 주조대: 구리 주괴를 녹여 화폐를 발행한다 (D-56). */
+    public static final DeferredBlock<dev.civilizeandgovern.block.MintBlock> MINT = BLOCKS.register("mint",
+            () -> new dev.civilizeandgovern.block.MintBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .sound(SoundType.ANVIL)
+                    .requiresCorrectToolForDrops()));
+    public static final DeferredItem<BlockItem> MINT_ITEM = ITEMS.register("mint",
+            () -> new BlockItem(MINT.get(), new Item.Properties()));
+    @SuppressWarnings("DataFlowIssue")
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<dev.civilizeandgovern.block.MintBlockEntity>> MINT_BE =
+            BLOCK_ENTITIES.register("mint",
+                    () -> BlockEntityType.Builder.of(dev.civilizeandgovern.block.MintBlockEntity::new, MINT.get()).build(null));
+
     @SuppressWarnings("DataFlowIssue")
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PlazaBlockEntity>> PLAZA_BE =
             BLOCK_ENTITIES.register("plaza_block",

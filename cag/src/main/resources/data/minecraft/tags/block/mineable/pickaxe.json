@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "civilizeandgovern:plaza_block"
+    "civilizeandgovern:plaza_block",
+    "civilizeandgovern:mint"
   ]
 }

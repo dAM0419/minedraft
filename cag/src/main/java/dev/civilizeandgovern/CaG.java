@@ -33,6 +33,7 @@ public final class CaG {
         modBus.addListener(Net::register);
         modBus.addListener(CaG::buildCreativeTabs);
         ServerEvents.init();
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(dev.civilizeandgovern.server.CagCommands::register);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ClientSetup.init(modBus);
         }
@@ -45,6 +46,7 @@ public final class CaG {
     private static void buildCreativeTabs(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.accept(Registration.PLAZA_ITEM.get());
+            event.accept(Registration.MINT_ITEM.get());
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(Registration.COIN.get());

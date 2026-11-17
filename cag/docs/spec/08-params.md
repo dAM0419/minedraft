@@ -64,6 +64,7 @@
 | `container.home_per_household` | 2 | 개 | 가구가 집에서 잡는 컨테이너 수 | |
 | `locker.slots` | 27 | 칸 | 사물함 인벤토리 | |
 | `vault.slots` | 270 | 칸 | 금고 하나의 창고 | |
+| `mint.coins_per_ingot` | 9 | 동화 | 주조대에서 구리 주괴 1개로 발행되는 금액. 구리 주괴의 기준가(9)와 맞췄다 | D-56 |
 | `map.refresh_cooldown_ticks` | 200 | 틱 | 지도 갱신 쿨다운 | |
 | `map.max_tables` | 5 | 개 | 한 변에 붙일 수 있는 지도 테이블 수 | |
 | `price.step` | 0.05 | | 호가 조정 폭 | 시뮬 |

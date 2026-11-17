@@ -6,7 +6,7 @@
 - 계정: 가구 지갑, 금고, 광산 조합(나누기 전의 하루치 수입), "세상에 나간 동화"(아이템으로 존재하는 돈의 합계 계수기). 범죄조직은 계정이 없고 은닉처의 동화 아이템을 쓴다(D-31).
 - 이동은 `Ledger.transfer(from, to, amount, reason)` 하나로만 한다. 잔고가 모자라면 실패하고 아무것도 바뀌지 않는다.
 - `reason`: `ISSUE`, `GRANT`(정착금), `SALE`, `DEPOSIT_ORDER`(주문 선금), `REFUND`, `CITY_PURCHASE`(시 수매), `WAGE`, `TAX`, `RENT`, `FINE`, `CONFISCATE`, `HOUSE_SALE`, `INHERIT`, `GIFT`, `STIPEND`, `COMPENSATION`, `HUSH`, `BRIBE`, `EXTORT`, `ROBBERY`, `EMBEZZLE`, `COOP_SHARE`, `WITHDRAW`, `DEPOSIT`.
-- **발행:** `Treasury.issue(amount)` 가 금고 잔고와 `issuedTotal` 을 같이 올린다. 돈이 새로 생기는 유일한 길이다.
+- **발행:** `Treasury.issue(amount)` 가 금고 잔고와 `issuedTotal` 을 같이 올린다. 돈이 새로 생기는 유일한 길이다. 발행은 주조대에서 구리 주괴를 녹여서만 한다(D-56): 주괴 1개당 `§mint.coins_per_ingot`. 구리는 사라진다.
 - **아이템 동화:** 금고(블록)에서 꺼내면(`WITHDRAW`) 금고 잔고가 줄고 "세상에 나간 동화"가 늘며 아이템이 생긴다. 넣으면(`DEPOSIT`) 반대다. 주민에게 건네면 "세상에 나간 동화"에서 그 가구 지갑으로 옮긴다.
 - 주민이 아이템 동화를 손에 넣는 경우(조직의 은닉처)에도 같은 계수기를 쓴다.
 - 불변식 1의 검사식: `Σ지갑 + 금고 + Σ광산 조합 + 세상에 나간 동화 = issuedTotal`. 아이템이 용암에 타도 계수기는 안 줄어든다(그 돈은 영영 묶인 것으로 본다).

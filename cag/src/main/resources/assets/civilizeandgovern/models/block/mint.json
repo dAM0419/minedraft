@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "civilizeandgovern:block/mint_top",
+    "bottom": "minecraft:block/smooth_stone",
+    "side": "civilizeandgovern:block/mint_side"
+  }
+}

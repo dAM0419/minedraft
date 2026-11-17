@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 public record CityView(int id, UUID areaId, String name, String currency, String founderName, long cityDay,
                        long treasury, long issuedTotal, double priceAnchor, int level, int population,
-                       int chunks, int maxChunks, boolean forceLoad, boolean active, int myPermissions,
+                       int chunks, int maxChunks, boolean forceLoad, boolean active, boolean allowDissolve, int myPermissions,
                        List<Member> council) {
 
     public record Member(String name, int permissions) {}
@@ -30,7 +30,7 @@ public record CityView(int id, UUID areaId, String name, String currency, String
         for (Map.Entry<UUID, Integer> e : c.council.entrySet()) members.add(new Member(nameOf(server, e.getKey()), e.getValue()));
         return new CityView(c.id, c.areaId, c.name, c.currency, nameOf(server, c.founder), c.cityDay, c.treasury, c.issuedTotal,
                 c.priceAnchor, c.level, c.population, a == null ? 0 : a.chunks().size(), CityManager.maxChunks(c),
-                c.forceLoad, c.active, CityPermission.bits(c, viewer.getUUID()), members);
+                c.forceLoad, c.active, c.allowDissolve, CityPermission.bits(c, viewer.getUUID()), members);
     }
 
     private static String nameOf(MinecraftServer server, UUID id) {
@@ -56,6 +56,7 @@ public record CityView(int id, UUID areaId, String name, String currency, String
         buf.writeVarInt(maxChunks);
         buf.writeBoolean(forceLoad);
         buf.writeBoolean(active);
+        buf.writeBoolean(allowDissolve);
         buf.writeVarInt(myPermissions);
         buf.writeVarInt(council.size());
         for (Member m : council) {
@@ -71,12 +72,12 @@ public record CityView(int id, UUID areaId, String name, String currency, String
         long day = buf.readVarLong(), treasury = buf.readVarLong(), issued = buf.readVarLong();
         double p = buf.readDouble();
         int level = buf.readVarInt(), pop = buf.readVarInt(), chunks = buf.readVarInt(), max = buf.readVarInt();
-        boolean force = buf.readBoolean(), active = buf.readBoolean();
+        boolean force = buf.readBoolean(), active = buf.readBoolean(), dissolve = buf.readBoolean();
         int perms = buf.readVarInt();
         int n = buf.readVarInt();
         List<Member> council = new ArrayList<>();
         for (int i = 0; i < n && i < 256; i++) council.add(new Member(buf.readUtf(), buf.readVarInt()));
-        return new CityView(id, area, name, currency, founder, day, treasury, issued, p, level, pop, chunks, max, force, active, perms, council);
+        return new CityView(id, area, name, currency, founder, day, treasury, issued, p, level, pop, chunks, max, force, active, dissolve, perms, council);
     }
 
     public boolean can(CityPermission p) {

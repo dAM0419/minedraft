@@ -42,8 +42,9 @@ public class PlazaBlock extends Block implements EntityBlock {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (level.isClientSide) return;
         CityManager m = CityManager.current();
-        // 이미 어떤 도시의 관리 청크인 곳에는 놓을 수 없다: 놓은 블록을 아이템으로 돌려준다
-        if (m != null && m.cityAt(level.dimension(), new ChunkPos(pos).toLong()) != null) {
+        // 도시의 관리 청크 안에는 그 도시의 시장만 놓을 수 있다 (광장을 옮기려고 놓는 경우. D-55). 아니면 아이템으로 돌려준다
+        City here = m == null ? null : m.cityAt(level.dimension(), new ChunkPos(pos).toLong());
+        if (here != null && !(placer instanceof ServerPlayer sp0 && sp0.getUUID().equals(here.founder))) {
             level.destroyBlock(pos, true);
             if (placer instanceof ServerPlayer sp) ServerNet.toast(sp, "civilizeandgovern.msg.chunk_taken");
         }
@@ -53,7 +54,18 @@ public class PlazaBlock extends Block implements EntityBlock {
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (!level.isClientSide && player instanceof ServerPlayer sp && level.getBlockEntity(pos) instanceof PlazaBlockEntity plaza) {
             City c = plaza.cityId() > 0 ? CityManager.get().byId(plaza.cityId()) : null;
-            if (c == null) {
+            City here = c != null ? null : CityManager.get().cityAt(level.dimension(), new ChunkPos(pos).toLong());
+            if (c == null && here != null) {
+                // 도시 안에 놓인 주인 없는 광장 블록: 시장이면 광장을 이곳으로 옮길지 묻는다
+                if (sp.getUUID().equals(here.founder)) {
+                    Net.toPlayer(sp, Msg.S_MOVE_SCREEN, buf -> {
+                        buf.writeBlockPos(pos);
+                        buf.writeUtf(here.name);
+                    });
+                } else {
+                    ServerNet.toast(sp, "civilizeandgovern.msg.plaza_not_mayor");
+                }
+            } else if (c == null) {
                 Net.toPlayer(sp, Msg.S_FOUND_SCREEN, buf -> buf.writeBlockPos(pos));
             } else if (CityPermission.isMember(c, sp.getUUID())) {
                 ServerNet.sendPanel(sp, c, true);

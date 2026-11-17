@@ -45,12 +45,18 @@ public final class ServerNet {
                 sendPanel(player, c, false); // 클라이언트의 청크 상한을 먼저 맞춘다
                 AreaManager.get().openEditor(player, a, c.plazaPos);
             }
-            case Msg.C_ISSUE -> {
-                City c = city(player, buf.readVarInt(), CityPermission.ISSUE);
-                long amount = buf.readVarLong();
-                if (c == null || amount <= 0 || amount > 1_000_000_000L) return;
-                c.issue(amount);
-                CityManager.get().setDirty();
+            case Msg.C_MINT -> mint(player, buf.readBlockPos(), buf.readVarInt());
+            case Msg.C_MINT_TAKE -> mintTake(player, buf.readBlockPos());
+            case Msg.C_MOVE_PLAZA -> movePlaza(player, buf.readBlockPos());
+            case Msg.C_ALLOW_DISSOLVE -> {
+                City c = city(player, buf.readVarInt(), CityPermission.COUNCIL); // COUNCIL 은 시장만 가진다
+                boolean on = buf.readBoolean();
+                if (c == null) return;
+                if (on && c.population > 0) {
+                    toast(player, "civilizeandgovern.msg.plaza_has_citizens");
+                    return;
+                }
+                c.allowDissolve = on;
                 sendPanel(player, c, false);
             }
             case Msg.C_FORCE_LOAD -> {
@@ -112,6 +118,96 @@ public final class ServerNet {
         plaza.setCity(c.id);
         CagZones.CHUNK_CAPS.put(c.areaId, CityManager.maxChunks(c));
         sendPanel(player, c, true);
+    }
+
+    /**
+     * 광장 옮기기 (D-55): 시장이 자기 도시의 관리 청크 안에 새 광장 블록을 놓고 지정하면,
+     * 옛 광장 블록은 아이템으로 떨어지고 새 블록이 도시의 광장 블록이 된다.
+     */
+    private static void movePlaza(ServerPlayer player, BlockPos pos) {
+        ServerLevel level = player.serverLevel();
+        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64 * 64) return;
+        if (!(level.getBlockEntity(pos) instanceof PlazaBlockEntity plaza) || plaza.cityId() > 0) return;
+        CityManager m = CityManager.get();
+        City c = m.cityAt(level.dimension(), new ChunkPos(pos).toLong());
+        if (c == null) return;
+        if (!player.getUUID().equals(c.founder)) {
+            toast(player, "civilizeandgovern.msg.plaza_not_mayor");
+            return;
+        }
+        BlockPos old = c.plazaPos;
+        if (!old.equals(pos) && level.getBlockEntity(old) instanceof PlazaBlockEntity oldPlaza) {
+            oldPlaza.setCity(0);
+            level.destroyBlock(old, true);
+        }
+        plaza.setCity(c.id);
+        c.plazaPos = pos.immutable();
+        m.setDirty();
+        toast(player, "civilizeandgovern.msg.plaza_moved");
+        sendPanel(player, c, true);
+    }
+
+    /** 주조 (D-56): 주조대에 넣어 둔 구리 주괴를 녹여 그만큼 발행한다. 금고 잔고와 발행 누계가 같이 오른다. */
+    private static void mint(ServerPlayer player, BlockPos pos, int ingots) {
+        ServerLevel level = player.serverLevel();
+        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64 * 64) return;
+        if (!(level.getBlockEntity(pos) instanceof dev.civilizeandgovern.block.MintBlockEntity mint)) return;
+        City c = CityManager.get().cityAt(level.dimension(), new ChunkPos(pos).toLong());
+        if (c == null) {
+            toast(player, "civilizeandgovern.msg.mint_outside");
+            return;
+        }
+        if (!CityPermission.has(c, player.getUUID(), CityPermission.ISSUE)) {
+            toast(player, "civilizeandgovern.msg.no_permission");
+            return;
+        }
+        if (ingots <= 0 || ingots > mint.copper()) return;
+        long amount = (long) ingots * dev.civilizeandgovern.config.Params.i("mint.coins_per_ingot");
+        mint.take(ingots);
+        c.issue(amount);
+        CityManager.get().setDirty();
+        level.playSound(null, pos, net.minecraft.sounds.SoundEvents.ANVIL_USE, net.minecraft.sounds.SoundSource.BLOCKS, 0.6F, 1.4F);
+        sendMint(player, pos, false);
+    }
+
+    private static void mintTake(ServerPlayer player, BlockPos pos) {
+        ServerLevel level = player.serverLevel();
+        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64 * 64) return;
+        if (!(level.getBlockEntity(pos) instanceof dev.civilizeandgovern.block.MintBlockEntity mint)) return;
+        City c = CityManager.get().cityAt(level.dimension(), new ChunkPos(pos).toLong());
+        if (c != null && !CityPermission.isMember(c, player.getUUID())) {
+            toast(player, "civilizeandgovern.msg.outsider");
+            return;
+        }
+        int n = mint.copper();
+        mint.take(n);
+        while (n > 0) {
+            int k = Math.min(64, n);
+            player.getInventory().placeItemBackInInventory(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.COPPER_INGOT, k));
+            n -= k;
+        }
+        sendMint(player, pos, false);
+    }
+
+    /** 주조대 화면 자료를 보낸다. */
+    public static void sendMint(ServerPlayer player, BlockPos pos, boolean open) {
+        ServerLevel level = player.serverLevel();
+        if (!(level.getBlockEntity(pos) instanceof dev.civilizeandgovern.block.MintBlockEntity mint)) return;
+        City c = CityManager.get().cityAt(level.dimension(), new ChunkPos(pos).toLong());
+        if (c == null) {
+            toast(player, "civilizeandgovern.msg.mint_outside");
+            return;
+        }
+        if (!CityPermission.isMember(c, player.getUUID())) {
+            toast(player, "civilizeandgovern.msg.outsider");
+            return;
+        }
+        MintView view = new MintView(pos, c.name, c.currency, mint.copper(), dev.civilizeandgovern.config.Params.i("mint.coins_per_ingot"),
+                c.treasury, c.issuedTotal, CityPermission.has(c, player.getUUID(), CityPermission.ISSUE));
+        Net.toPlayer(player, Msg.S_MINT, buf -> {
+            buf.writeBoolean(open);
+            view.write(buf);
+        });
     }
 
     private static String clean(String s, int max) {

@@ -33,7 +33,7 @@ public final class City {
     /** Lib 영역 ID. 관리 청크와 구역은 이 영역이 가진다. */
     public final UUID areaId;
     public final ResourceKey<Level> dimension;
-    public final BlockPos plazaPos;
+    public BlockPos plazaPos;
 
     // 시계: 도시가 켜진 채 맞은 새벽의 수 (D-26)
     public long cityDay;
@@ -62,6 +62,8 @@ public final class City {
     // 저장하지 않는 상태
     /** 지금 켜져 있는가 (관리 청크가 로딩돼 있고 시간이 흐르는가). */
     public transient boolean active;
+    /** 도시 해체 허용 (D-55). 켜져 있을 때만 시장이 광장 블록을 부술 수 있다. 저장하지 않는다: 서버가 다시 뜨면 꺼진다. */
+    public transient boolean allowDissolve;
     public transient int inactiveTicks;
 
     public City(int id, String name, String currency, UUID founder, long seed, UUID areaId, ResourceKey<Level> dimension, BlockPos plazaPos) {

@@ -35,6 +35,21 @@ public final class ClientNet {
                 if (mc.screen instanceof CityPanelScreen panel && panel.cityId() == view.id()) panel.update(view);
                 else if (open) mc.setScreen(new CityPanelScreen(view));
             }
+            case Msg.S_MOVE_SCREEN -> {
+                BlockPos pos = buf.readBlockPos();
+                String city = buf.readUtf();
+                mc.setScreen(new net.minecraft.client.gui.screens.ConfirmScreen(yes -> {
+                    if (yes) dev.civilizeandgovern.net.Net.toServer(Msg.C_MOVE_PLAZA, b -> b.writeBlockPos(pos));
+                    mc.setScreen(null);
+                }, net.minecraft.network.chat.Component.translatable("civilizeandgovern.move.title"),
+                        net.minecraft.network.chat.Component.translatable("civilizeandgovern.move.message", city)));
+            }
+            case Msg.S_MINT -> {
+                boolean open = buf.readBoolean();
+                dev.civilizeandgovern.net.MintView view = dev.civilizeandgovern.net.MintView.read(buf);
+                if (mc.screen instanceof MintScreen ms && ms.pos().equals(view.pos())) ms.update(view);
+                else if (open) mc.setScreen(new MintScreen(view));
+            }
             default -> CaG.LOGGER.warn("CaG: unknown message {}", kind);
         }
     }
