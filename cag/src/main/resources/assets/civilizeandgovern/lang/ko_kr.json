@@ -96,5 +96,8 @@
   "civilizeandgovern.status.active": "켜짐",
   "civilizeandgovern.status.active_forced": "켜짐(강제 로딩)",
   "civilizeandgovern.status.inactive": "꺼짐",
-  "civilizeandgovern.status.none": "볼 수 있는 도시가 없습니다"
+  "civilizeandgovern.status.none": "볼 수 있는 도시가 없습니다",
+  "civilizeandgovern.editor.range_size": "구역 범위 %s×%s×%s",
+  "civilizeandgovern.editor.range_release": "놓으면: 범위 안 칸(건물 안쪽 포함)은 이 구역에 들어가고, 범위 밖 칸은 빠집니다",
+  "civilizeandgovern.editor.range_handle": "끌어서 구역 범위 늘리기·줄이기"
 }

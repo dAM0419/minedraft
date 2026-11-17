@@ -96,5 +96,8 @@
   "civilizeandgovern.status.active": "running",
   "civilizeandgovern.status.active_forced": "running (force loaded)",
   "civilizeandgovern.status.inactive": "paused",
-  "civilizeandgovern.status.none": "No city to show"
+  "civilizeandgovern.status.none": "No city to show",
+  "civilizeandgovern.editor.range_size": "Zone range %s×%s×%s",
+  "civilizeandgovern.editor.range_release": "On release: cells inside (including building interiors) join this zone, cells outside leave it",
+  "civilizeandgovern.editor.range_handle": "Drag to grow or shrink the zone"
 }
