@@ -7,7 +7,7 @@
 | 무엇 | 어디 |
 |---|---|
 | 구현 명세(원본) | 이 폴더의 `docs/spec/` |
-| 같은 명세의 사본 | claude.ai 프로젝트 "마인크래프트"의 문서 `cag/spec/` |
+| 같은 명세의 사본 | claude.ai 프로젝트 "마인크래프트"의 문서 `cag/spec/`. **D-55·D-56(2026-11-17)은 아직 사본에 없다.** 이 일지(`cag/WORKLOG.md`)만 최신이다. 다르면 이 폴더가 맞다 |
 | 시뮬레이터 | `docs/spec/sim/market_sim.py`(1판), `market_sim2.py`(2판) |
 | 기획서(사람이 읽는 요약) | Claude 문서 "CaG 기획서 v2 — 살아 있는 마을" https://claude.ai/artifact/2DfBvcqUpWXFJH3ATtNELe |
 | 구 기획서(참고용) | https://claude.ai/artifact/NUUL9Jv9CR7cqbwfpHLEZm |
