@@ -127,6 +127,12 @@ public final class SpaceTagLayer implements AreaLayer {
         return id;
     }
 
+    /** 이 칸에 태그가 하나라도 있는가 (목록을 만들지 않는다: 시선 고르기처럼 자주 묻는 곳용). */
+    public boolean hasAny(long pos) {
+        for (Long2ObjectOpenHashMap<SpaceTag> m : groups.values()) if (m.containsKey(pos)) return true;
+        return false;
+    }
+
     /** 이 칸의 모든 태그 (묶음 순서). */
     public List<SpaceTag> tagsAt(long pos) {
         List<SpaceTag> out = new ArrayList<>(2);

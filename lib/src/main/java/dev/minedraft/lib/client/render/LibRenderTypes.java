@@ -84,6 +84,18 @@ public final class LibRenderTypes extends RenderStateShard {
                     .setDepthTestState(LEQUAL_DEPTH_TEST)
                     .createCompositeState(false));
 
+    /** 태그 보기 상자: 뒷면을 그리지 않는다 (반투명 상자의 먼 면이 겹쳐 색이 짙어지지 않게). 면은 바깥에서 반시계로. */
+    public static final RenderType TAG_BOXES = RenderType.create("minedraftlib_tag_boxes", DefaultVertexFormat.POSITION_COLOR,
+            VertexFormat.Mode.QUADS, 65536, false, true,
+            RenderType.CompositeState.builder()
+                    .setShaderState(POSITION_COLOR_SHADER)
+                    .setLayeringState(VIEW_OFFSET_Z_LAYERING)
+                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setWriteMaskState(COLOR_WRITE)
+                    .setCullState(CULL)
+                    .setDepthTestState(LEQUAL_DEPTH_TEST)
+                    .createCompositeState(false));
+
     public static final RenderType QUADS_SEE_THROUGH = RenderType.create("minedraftlib_quads_see_through",
             DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS, 65536, false, true,
             RenderType.CompositeState.builder()

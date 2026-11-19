@@ -326,7 +326,7 @@ public final class EditorSession extends AreaEditorSession {
     }
 
     /** 서버가 도면 전체를 다시 보냄 (순서가 어긋났을 때). */
-    /** 태그 보기: DaB 묶음은 설계 칸 윗면을 태그 색으로 (철거할 칸은 빨강, 구조물 칸은 옅게), 다른 모드 묶음은 Lib 기본대로. */
+    /** 태그 보기: DaB 묶음은 설계 칸을 태그 색 상자로 (입체) (철거할 칸은 빨강, 구조물 칸은 옅게), 다른 모드 묶음은 Lib 기본대로. */
     @Override
     public void forEachTagCell(TagCellSink out) {
         boolean[] stopped = {false};
@@ -346,8 +346,6 @@ public final class EditorSession extends AreaEditorSession {
                 if (worldAt(x, y, z).isAir()) continue;
                 color = Ui.withAlpha(Ui.DEMOLISH, 90);
             } else {
-                Resolved above = model.resolved(x, y + 1, z);
-                if (above != null && !above.isAir() && !(cutActive && isCut(x, y + 1, z))) continue;
                 dev.minedraft.lib.space.SpaceTag t = r.tag().space();
                 int rgb = t == null ? Ui.DEMOLISH : t.color();
                 color = Ui.withAlpha(0xFF000000 | rgb, r.tag() == DesignTag.STRUCTURE ? 100 : 140);

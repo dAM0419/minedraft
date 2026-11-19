@@ -696,6 +696,7 @@ public abstract class AreaEditorScreen extends Screen {
             hover = null;
             return;
         }
+        base.pickTags = tagTool.active || tagView; // 공간 지정·태그 보기 중엔 태그 칸도 누를 수 있게
         if (tagTool.active) {
             hover = base.pick(mx, my);
             tagTool.hovered(hover);

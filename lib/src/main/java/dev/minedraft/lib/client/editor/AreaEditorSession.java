@@ -115,8 +115,7 @@ public abstract class AreaEditorSession implements ClientEditor {
     }
 
     /**
-     * 공간 태그 층의 칸 중 묶음 조건에 맞는 것: 잘리지 않았고 바로 위 칸에 같은 묶음 태그가 없는 것 (쌓인 칸은 맨 위만).
-     * 묶음마다 조금씩 높여 덮어 겹친 태그가 함께 보이게 한다.
+     * 공간 태그 층의 칸 중 묶음 조건에 맞는 것: 단면에 잘리지 않은 모든 칸 (태그 보기가 입체로 덮는다).
      */
     protected final void forEachLayerTag(TagCellSink out, java.util.function.Predicate<net.minecraft.resources.ResourceLocation> groups) {
         dev.minedraft.lib.space.SpaceTagLayer l = dev.minedraft.lib.space.SpaceTagLayer.of(area);
@@ -128,7 +127,6 @@ public abstract class AreaEditorSession implements ClientEditor {
                 long p = e.getLongKey();
                 int x = BlockPos.getX(p), y = BlockPos.getY(p), z = BlockPos.getZ(p);
                 if (cutActive && isCut(x, y, z)) continue;
-                if (cells.get(BlockPos.asLong(x, y + 1, z)) != null && !(cutActive && isCut(x, y + 1, z))) continue;
                 if (!out.accept(x, y, z, 0x6E000000 | (e.getValue().color() & 0xFFFFFF))) return;
             }
         }
@@ -220,6 +218,12 @@ public abstract class AreaEditorSession implements ClientEditor {
 
 
     public record Hit(BlockPos pos, Direction face, Vec3 location) {}
+
+    /**
+     * 시선 고르기에서 태그가 붙은 칸도 막힌 칸으로 본다 (편집창이 공간 지정 도구·태그 보기 중에 켠다).
+     * 빈 칸(공기)에 붙은 태그 — 예: CaG 구역 — 를 누르고 집을 수 있게.
+     */
+    public boolean pickTags;
 
 
     private final java.util.function.LongConsumer blockListener = pos -> {
@@ -718,6 +722,7 @@ public abstract class AreaEditorSession implements ClientEditor {
         double tmz = d.z == 0 ? Double.MAX_VALUE : (d.z > 0 ? (z + 1 - start.z) : (start.z - z)) * tdz;
         double max = t1 - t0;
         BlockPos.MutableBlockPos mp = new BlockPos.MutableBlockPos();
+        dev.minedraft.lib.space.SpaceTagLayer tags = pickTags ? dev.minedraft.lib.space.SpaceTagLayer.of(area) : null;
         for (int guard = 0; guard < 20000; guard++) {
             BlockState st = visibleAt(x, y, z, true);
             if (!st.isAir()) {
@@ -728,6 +733,12 @@ public abstract class AreaEditorSession implements ClientEditor {
                     BlockHitResult r = shape.clip(start, end, mp);
                     if (r != null) return new Hit(mp.immutable(), r.getDirection(), r.getLocation());
                 }
+            }
+            // 태그 칸: 블록이 없거나 블록 모양을 비껴가도 칸 전체를 맞힌다
+            if (tags != null && tags.hasAny(BlockPos.asLong(x, y, z)) && !(cutActive && isCut(x, y, z))) {
+                mp.set(x, y, z);
+                BlockHitResult r = Shapes.block().clip(start, end, mp);
+                if (r != null) return new Hit(mp.immutable(), r.getDirection(), r.getLocation());
             }
             double travelled;
             if (tmx < tmy && tmx < tmz) {

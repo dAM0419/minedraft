@@ -12,14 +12,23 @@ import net.minecraft.client.renderer.ShaderInstance;
 import org.joml.Matrix4f;
 
 /**
- * 공간 태그 보기 (T): 태그가 붙은 칸 윗면을 태그 색으로 덮는다. 칸 목록은 세션이 정한다
- * ({@link AreaEditorSession#forEachTagCell}). 영역 판·단면이 바뀔 때만 다시 굽는다.
+ * 공간 태그 보기 (T): 태그가 붙은 칸을 태그 색 상자로 덮는다 (입체). 같은 색 칸끼리 맞닿은 면은 빼서
+ * 한 덩어리로 보이게 하고, 한 칸에 여러 태그가 겹치면 색마다 조금씩 크게 덮어 함께 보이게 한다.
+ * 칸 목록은 세션이 정한다 ({@link AreaEditorSession#forEachTagCell}). 영역 판·단면이 바뀔 때만 다시 굽는다.
  */
 public final class TagView {
     private TagView() {}
 
-    /** 한 번에 굽는 최대 칸 수. */
-    private static final int LIMIT = 150_000;
+    /** 한 번에 굽는 최대 칸 수, 색 수. */
+    private static final int LIMIT = 150_000, MAX_COLORS = 32;
+
+    private static void quad(BufferBuilder b, float ax, float ay, float az, float bx, float by, float bz,
+                             float cx, float cy, float cz, float dx, float dy, float dz, int r, int g, int bl, int a) {
+        b.addVertex(ax, ay, az).setColor(r, g, bl, a);
+        b.addVertex(bx, by, bz).setColor(r, g, bl, a);
+        b.addVertex(cx, cy, cz).setColor(r, g, bl, a);
+        b.addVertex(dx, dy, dz).setColor(r, g, bl, a);
+    }
 
     private static VertexBuffer buffer;
     private static long key = Long.MIN_VALUE;
@@ -49,18 +58,40 @@ public final class TagView {
             oy = s.area.minY;
             oz = a.minZ();
             BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+            // 색별 칸 모음 (겹친 태그는 색이 다르다)
+            it.unimi.dsi.fastutil.ints.IntArrayList colors = new it.unimi.dsi.fastutil.ints.IntArrayList();
+            java.util.List<it.unimi.dsi.fastutil.longs.LongOpenHashSet> sets = new java.util.ArrayList<>();
             int[] n = {0};
             s.forEachTagCell((x, y, z, color) -> {
                 if (n[0] >= LIMIT) return false;
-                float fx = x - ox, fy = y + 1.01F - oy, fz = z - oz;
-                int cr = (color >> 16) & 0xFF, cg = (color >> 8) & 0xFF, cb = color & 0xFF, ca = (color >>> 24) & 0xFF;
-                b.addVertex(fx, fy, fz).setColor(cr, cg, cb, ca);
-                b.addVertex(fx, fy, fz + 1).setColor(cr, cg, cb, ca);
-                b.addVertex(fx + 1, fy, fz + 1).setColor(cr, cg, cb, ca);
-                b.addVertex(fx + 1, fy, fz).setColor(cr, cg, cb, ca);
-                n[0]++;
+                int ci = colors.indexOf(color);
+                if (ci < 0) {
+                    if (colors.size() >= MAX_COLORS) return true;
+                    ci = colors.size();
+                    colors.add(color);
+                    sets.add(new it.unimi.dsi.fastutil.longs.LongOpenHashSet());
+                }
+                if (sets.get(ci).add(net.minecraft.core.BlockPos.asLong(x, y, z))) n[0]++;
                 return true;
             });
+            for (int ci = 0; ci < colors.size(); ci++) {
+                int color = colors.getInt(ci);
+                int cr = (color >> 16) & 0xFF, cg = (color >> 8) & 0xFF, cb = color & 0xFF, ca = (color >>> 24) & 0xFF;
+                float e = 0.006F + 0.004F * ci; // 색마다 조금씩 크게 (겹친 면이 깜빡이지 않게)
+                it.unimi.dsi.fastutil.longs.LongOpenHashSet set = sets.get(ci);
+                for (long p : set) {
+                    int x = net.minecraft.core.BlockPos.getX(p), y = net.minecraft.core.BlockPos.getY(p), z = net.minecraft.core.BlockPos.getZ(p);
+                    float x0 = x - ox - e, y0 = y - oy - e, z0 = z - oz - e;
+                    float x1 = x - ox + 1 + e, y1 = y - oy + 1 + e, z1 = z - oz + 1 + e;
+                    // 같은 색 이웃이 없는 면만
+                    if (!set.contains(net.minecraft.core.BlockPos.asLong(x, y + 1, z))) quad(b, x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, cr, cg, cb, ca);
+                    if (!set.contains(net.minecraft.core.BlockPos.asLong(x, y - 1, z))) quad(b, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, cr, cg, cb, ca);
+                    if (!set.contains(net.minecraft.core.BlockPos.asLong(x, y, z - 1))) quad(b, x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0, cr, cg, cb, ca);
+                    if (!set.contains(net.minecraft.core.BlockPos.asLong(x, y, z + 1))) quad(b, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, cr, cg, cb, ca);
+                    if (!set.contains(net.minecraft.core.BlockPos.asLong(x - 1, y, z))) quad(b, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, cr, cg, cb, ca);
+                    if (!set.contains(net.minecraft.core.BlockPos.asLong(x + 1, y, z))) quad(b, x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1, cr, cg, cb, ca);
+                }
+            }
             var mesh = b.build();
             if (mesh != null) {
                 buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
@@ -71,13 +102,13 @@ public final class TagView {
         }
         if (buffer == null) return;
         Matrix4f mv = new Matrix4f(rot).translate((float) (ox - s.camera.tx), (float) (oy - s.camera.ty), (float) (oz - s.camera.tz));
-        LibRenderTypes.QUADS.setupRenderState();
+        LibRenderTypes.TAG_BOXES.setupRenderState();
         ShaderInstance shader = RenderSystem.getShader();
         if (shader != null) {
             buffer.bind();
             buffer.drawWithShader(mv, proj, shader);
             VertexBuffer.unbind();
         }
-        LibRenderTypes.QUADS.clearRenderState();
+        LibRenderTypes.TAG_BOXES.clearRenderState();
     }
 }
