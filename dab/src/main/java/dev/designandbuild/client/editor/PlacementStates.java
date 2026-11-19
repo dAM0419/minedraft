@@ -99,8 +99,12 @@ public final class PlacementStates {
             case NORTH -> hz = target.getZ() + 1;
         }
         if (face.getAxis().isHorizontal()) hy = target.getY() + (upper ? 0.75 : 0.25);
-        BlockHitResult hit = new BlockHitResult(new Vec3(hx, hy, hz), face, target.relative(face.getOpposite()), false);
-        VirtualPlaceContext ctx = new VirtualPlaceContext(level, stack, hit, target, look, lookH);
+        BlockPos support = target.relative(face.getOpposite());
+        BlockHitResult hit = new BlockHitResult(new Vec3(hx, hy, hz), face, support, false);
+        // 붙일 면 뒤에 단단한 블록이 있는 가짜 월드: 받침이 있어야 놓이는 블록(벽 횃불·사다리·벽 표지판·버튼·매단 랜턴 등)이
+        // 빈 하늘에서도 제 모양을 고르게 한다. 없으면 실제 월드(빈 하늘)로.
+        Level placeLevel = supportLevel(level, support);
+        VirtualPlaceContext ctx = new VirtualPlaceContext(placeLevel != null ? placeLevel : level, stack, hit, target, look, lookH);
 
         BlockState state = null;
         try {
@@ -112,6 +116,39 @@ public final class PlacementStates {
         if (state == null) state = fallback(block.defaultBlockState(), lookH, look, face, upper);
         if (state.hasProperty(BlockStateProperties.WATERLOGGED)) state = state.setValue(BlockStateProperties.WATERLOGGED, false);
         return state;
+    }
+
+    // ---- 받침 블록이 있는 가짜 월드 (설치 상태 계산용) ----
+    private static final BlockState SUPPORT = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+    private static long supportPos = Long.MIN_VALUE;
+    @Nullable
+    private static dev.minedraft.lib.client.render.FakeLevel supportLevel;
+    @Nullable
+    private static Level supportLevelFor;
+
+    @Nullable
+    private static Level supportLevel(Level real, BlockPos support) {
+        if (!(real instanceof net.minecraft.client.multiplayer.ClientLevel cl)) return null;
+        if (supportLevel == null || supportLevelFor != real) {
+            supportLevelFor = real;
+            try {
+                supportLevel = new dev.minedraft.lib.client.render.FakeLevel(new dev.minedraft.lib.client.render.FakeLevel.Source() {
+                    @Override
+                    public BlockState blockAt(int x, int y, int z) {
+                        return BlockPos.asLong(x, y, z) == supportPos ? SUPPORT : net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+                    }
+
+                    @Override
+                    public net.minecraft.world.level.block.entity.BlockEntity blockEntity(BlockPos pos) {
+                        return null;
+                    }
+                }, cl, cl.getMinBuildHeight(), cl.getHeight());
+            } catch (Throwable t) {
+                supportLevel = null;
+            }
+        }
+        supportPos = support.asLong();
+        return supportLevel;
     }
 
     /** StandingAndWallBlockItem.wallBlock (비공개). 한 번만 찾는다. */
